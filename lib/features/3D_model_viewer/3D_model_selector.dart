@@ -28,14 +28,14 @@ class ModelSelectorPage extends StatelessWidget {
             ),
             const SizedBox(height: 32),
             OptionCard(
-              title: MyTexts.drill,
+              title: MyTexts.standardModel,
               description: MyTexts.projectSelectorNewCanvaDesc,
               icon: Icons.add_circle_outline,
               color: MyColors.green,
               onTap: () {
                 Get.toNamed(
                   MyRoutes.modelViewer3D,
-                  parameters: {'assetPath': 'assets/drill.glb'},
+                  parameters: {'assetPath': 'assets/default_model.glb'},
                 );
               },
             ),

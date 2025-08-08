@@ -84,7 +84,6 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/drill.glb
     - assets/saw.glb
     - assets/default_model.glb
     - assets/crane.svg
