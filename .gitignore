@@ -53,44 +53,44 @@ app.*.map.json
 # Unity defaults (nested in unity/ folder)
 # ----------------------------
 # Unity cache and temp files
-unity/[Ll]ibrary/
-unity/[Tt]emp/
-unity/[Oo]bj/
-unity/[Bb]uild/
-unity/[Bb]uilds/
-unity/[Ll]ogs/
+unity/ArMachines/[Ll]ibrary/
+unity/ArMachines/[Tt]emp/
+unity/ArMachines/[Oo]bj/
+unity/ArMachines/[Bb]uild/
+unity/ArMachines/[Bb]uilds/
+unity/ArMachines/[Ll]ogs/
 
 # Unity auto-generated project files
-unity/[Mm]emoryCaptures/
-unity/[Rr]ecords/
-unity/[Uu]ser[Ss]ettings/
-unity/[Pp]ackages/packages-lock.json
+unity/ArMachines/[Mm]emoryCaptures/
+unity/ArMachines/[Rr]ecords/
+unity/ArMachines/[Uu]ser[Ss]ettings/
+unity/ArMachines/[Pp]ackages/packages-lock.json
 
 # Unity crash logs
-unity/*.stacktrace
+unity/ArMachines/*.stacktrace
 
 # Unity Asset meta backups
-unity/[Aa]ssets/**/*.meta
+unity/ArMachines/[Aa]ssets/**/*.meta
 
 # Ignore Unity's Collaborate cache
-unity/[Cc]ollab/
+unity/ArMachines/[Cc]ollab/
 
 # Visual Studio & JetBrains IDE stuff (if you open Unity in them)
-unity/.vs/
-unity/.idea/
-unity/*.csproj
-unity/*.unityproj
-unity/*.sln
-unity/*.suo
-unity/*.tmp
-unity/*.user
-unity/*.userprefs
+unity/ArMachines/.vs/
+unity/ArMachines/.idea/
+unity/ArMachines/*.csproj
+unity/ArMachines/*.unityproj
+unity/ArMachines/*.sln
+unity/ArMachines/*.suo
+unity/ArMachines/*.tmp
+unity/ArMachines/*.user
+unity/ArMachines/*.userprefs
 
 # OS-specific junk
-unity/[Tt]humbs.db
-unity/[Dd]esktop.ini
-unity/[Nn]ode_[Mm]odules/
-unity/.DS_Store
-unity/[Ss]ymlinks/
+unity/ArMachines/[Tt]humbs.db
+unity/ArMachines/[Dd]esktop.ini
+unity/ArMachines/[Nn]ode_[Mm]odules/
+unity/ArMachines/.DS_Store
+unity/ArMachines/[Ss]ymlinks/
 
 unityLibrary/
