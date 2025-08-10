@@ -47,4 +47,50 @@ app.*.map.json
 /assets/
 
 *.glb
+
+
+# ----------------------------
+# Unity defaults (nested in unity/ folder)
+# ----------------------------
+# Unity cache and temp files
+unity/[Ll]ibrary/
+unity/[Tt]emp/
+unity/[Oo]bj/
+unity/[Bb]uild/
+unity/[Bb]uilds/
+unity/[Ll]ogs/
+
+# Unity auto-generated project files
+unity/[Mm]emoryCaptures/
+unity/[Rr]ecords/
+unity/[Uu]ser[Ss]ettings/
+unity/[Pp]ackages/packages-lock.json
+
+# Unity crash logs
+unity/*.stacktrace
+
+# Unity Asset meta backups
+unity/[Aa]ssets/**/*.meta
+
+# Ignore Unity's Collaborate cache
+unity/[Cc]ollab/
+
+# Visual Studio & JetBrains IDE stuff (if you open Unity in them)
+unity/.vs/
+unity/.idea/
+unity/*.csproj
+unity/*.unityproj
+unity/*.sln
+unity/*.suo
+unity/*.tmp
+unity/*.user
+unity/*.userprefs
+
+# OS-specific junk
+unity/[Tt]humbs.db
+unity/[Dd]esktop.ini
+unity/[Nn]ode_[Mm]odules/
+unity/.DS_Store
+unity/[Ss]ymlinks/
+
 unityLibrary/
