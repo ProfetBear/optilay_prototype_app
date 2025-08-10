@@ -41,8 +41,8 @@ class OptionCard extends StatelessWidget {
           children: [
             CircleAvatar(
               backgroundColor: color.withOpacity(0.1),
-              child: Icon(icon, color: color, size: MySizes.iconLg),
               radius: 28,
+              child: Icon(icon, color: color, size: MySizes.iconLg),
             ),
             const SizedBox(width: MySizes.spacing),
             Expanded(
