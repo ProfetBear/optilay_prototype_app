@@ -23,7 +23,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       initialBinding: GeneralBindings(),
       getPages: AppRoutes.pages,
-      initialRoute: MyRoutes.home,
+      initialRoute: '/simple',
     );
   }
 }

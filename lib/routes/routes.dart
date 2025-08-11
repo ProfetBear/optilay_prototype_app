@@ -8,6 +8,9 @@ class MyRoutes {
 
   static const modelSelector3D = '/model_selector';
   static const modelViewer3D = '/model_viewer';
+
+  // Unity routes
+  static const simpleUnity = '/simple';
   //--------- SETTINGS ---------
   static const settings = '/settings';
   //--------- PROFILE ---------

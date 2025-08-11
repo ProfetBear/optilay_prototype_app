@@ -44,3 +44,7 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    implementation(project(":unityLibrary"))
+}

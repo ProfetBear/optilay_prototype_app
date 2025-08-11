@@ -4,6 +4,7 @@ import 'package:optilay_prototype_app/features/2D_layout_builder/screens/new_can
 import 'package:optilay_prototype_app/features/2D_layout_builder/screens/project_selector_page.dart';
 import 'package:optilay_prototype_app/features/3D_model_viewer/3D_model_selector.dart';
 import 'package:optilay_prototype_app/features/3D_model_viewer/3D_model_viewer.dart';
+import 'package:optilay_prototype_app/features/unity/simple_screen.dart';
 import 'package:optilay_prototype_app/home.dart';
 import 'package:optilay_prototype_app/utils/constants/text_strings.dart';
 import 'routes.dart';
@@ -65,6 +66,12 @@ class AppRoutes {
       },
     ),
 
+    GetPage(
+      name: MyRoutes.simpleUnity,
+      page: () {
+        return SimpleScreen();
+      },
+    ),
     // -- TODO Authentication
     /*
     GetPage(
