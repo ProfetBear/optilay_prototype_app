@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:optilay_prototype_app/common/widgets/option_card.dart';
 import 'package:optilay_prototype_app/routes/routes.dart';
+import 'package:optilay_prototype_app/utils/constants/api_constants.dart';
 import 'package:optilay_prototype_app/utils/constants/colors.dart';
+import 'package:optilay_prototype_app/utils/constants/config.dart';
 import 'package:optilay_prototype_app/utils/constants/text_strings.dart';
-import 'package:flutter_unity_widget/flutter_unity_widget.dart';
 
 class MyHomePage extends StatelessWidget {
   const MyHomePage({super.key, required this.title});
 
   final String title;
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -36,7 +36,11 @@ class MyHomePage extends StatelessWidget {
               icon: Icons.view_in_ar,
               color: MyColors.primary,
               onTap: () {
-                Get.toNamed(MyRoutes.modelSelector3D);
+                Get.toNamed(
+                  Config.unity
+                      ? MyRoutes.simpleUnity
+                      : MyRoutes.modelSelector3D,
+                );
               },
             ),
             const SizedBox(height: 20),

@@ -15,13 +15,14 @@ public class SceneLoader : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        
+
     }
 
     public void LoadScene(int idx)
     {
         Debug.Log("scene = " + idx);
         SceneManager.LoadScene(idx, LoadSceneMode.Single);
+        MessengerFlutter();
     }
 
     public void MessengerFlutter()
