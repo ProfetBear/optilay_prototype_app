@@ -45,15 +45,5 @@
     <true/>
     <key>UIApplicationSupportsIndirectInputEvents</key>
     <true/>
-    <key>NSAppTransportSecurity</key>
-    <dict>
-        <key>NSAllowsArbitraryLoadsInWebContent</key>
-        <true/>
-        <key>NSAllowsLocalNetworking</key>
-        <true/>
-    </dict>
-    <!-- Needed for model_viewer_plus embedded WebView -->
-    <key>io.flutter.embedded_views_preview</key>
-    <true/>
 </dict>
 </plist>
