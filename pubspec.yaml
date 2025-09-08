@@ -40,6 +40,8 @@ dependencies:
   connectivity_plus: ^6.1.4 
 
   # Viewer 3D
+  url_launcher: ^6.3.0
+
   model_viewer_plus: ^1.9.3
   shelf: ^1.4.1  # ✅ add this
 
@@ -85,7 +87,9 @@ flutter:
 
   assets:
     - assets/saw.glb
+    - assets/saw.usdz
     - assets/default_model.glb
+    - assets/default_model.usdz
     - assets/crane.svg
     
   # To add assets to your application, add an assets section, like this:

@@ -12,6 +12,7 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:flutter/foundation.dart';
 
 class ModelViewerPage extends StatefulWidget {
+  /// Path to your GLB asset in /assets (e.g. 'assets/saw.glb')
   final String filename;
 
   const ModelViewerPage({super.key, required this.filename});
@@ -21,65 +22,135 @@ class ModelViewerPage extends StatefulWidget {
 }
 
 class _ModelViewerPageState extends State<ModelViewerPage> {
-  String? localUrl;
+  String? _glbUrl; // http://127.0.0.1:8080/saw.glb
+  String? _usdzUrl; // http://127.0.0.1:8080/saw.usdz
+
+  // OPTIONAL: for Android Scene Viewer in production, host GLB on HTTPS and set this:
+  static const String? kAndroidGlbHttps = null;
 
   @override
   void initState() {
     super.initState();
-    _prepareModel(widget.filename);
+    _prepareAndServe();
   }
 
-  Future<void> _prepareModel(String assetPath) async {
-    final byteData = await rootBundle.load(assetPath);
-    final fileBytes = byteData.buffer.asUint8List();
-    final filename = assetPath.split('/').last;
-    final directory = await getApplicationDocumentsDirectory();
-    final filePath = '${directory.path}/$filename';
+  Future<void> _prepareAndServe() async {
+    final docs = await getApplicationDocumentsDirectory();
 
-    // Pass only primitive types to isolate
-    final modelFile = await compute(_writeFileIsolate, {
-      'bytes': fileBytes,
-      'path': filePath,
+    // ---- Copy GLB from assets to app docs ----
+    final glbData = await rootBundle.load(widget.filename); // 'assets/saw.glb'
+    final glbBytes = glbData.buffer.asUint8List();
+    final glbPath = '${docs.path}/saw.glb';
+    final glbFile = await compute(_writeFileIsolate, {
+      'bytes': glbBytes,
+      'path': glbPath,
     });
 
-    final handler = shelf.Pipeline().addHandler((shelf.Request request) async {
-      if (request.url.path == 'model') {
-        final bytes = await modelFile.readAsBytes();
-        return shelf.Response.ok(
-          bytes,
-          headers: {
-            'Content-Type': 'model/gltf+json',
-            'Access-Control-Allow-Origin': '*',
-          },
-        );
-      }
-      return shelf.Response.notFound(
-        'Not found',
-        headers: {'Access-Control-Allow-Origin': '*'},
-      );
+    // ---- Copy USDZ from assets to app docs ----
+    final usdzData = await rootBundle.load('assets/saw.usdz');
+    final usdzBytes = usdzData.buffer.asUint8List();
+    final usdzPath = '${docs.path}/saw.usdz';
+    final usdzFile = await compute(_writeFileIsolate, {
+      'bytes': usdzBytes,
+      'path': usdzPath,
     });
+
+    // ---- Shelf handler with logging + CORS + HEAD/OPTIONS ----
+    Future<shelf.Response> _okHead(String mime) async => shelf.Response.ok(
+      '',
+      headers: {
+        'Content-Type': mime,
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET,HEAD,OPTIONS',
+      },
+    );
+
+    final handler = const shelf.Pipeline()
+        .addMiddleware((inner) {
+          return (shelf.Request req) async {
+            debugPrint('[shelf] ${req.method} /${req.url.path}');
+            if (req.method == 'OPTIONS') {
+              return shelf.Response(
+                204,
+                headers: {
+                  'Access-Control-Allow-Origin': '*',
+                  'Access-Control-Allow-Methods': 'GET,HEAD,OPTIONS',
+                  'Access-Control-Allow-Headers':
+                      'Origin, Content-Type, Accept',
+                },
+              );
+            }
+            return inner(req);
+          };
+        })
+        .addHandler((shelf.Request request) async {
+          switch (request.url.path) {
+            case 'saw.glb':
+              if (request.method == 'HEAD') return _okHead('model/gltf-binary');
+              return shelf.Response.ok(
+                await glbFile.readAsBytes(),
+                headers: {
+                  'Content-Type': 'model/gltf-binary',
+                  'Access-Control-Allow-Origin': '*',
+                  'Access-Control-Allow-Methods': 'GET,HEAD,OPTIONS',
+                },
+              );
+            case 'saw.usdz':
+              if (request.method == 'HEAD')
+                return _okHead('model/vnd.usdz+zip');
+              return shelf.Response.ok(
+                await usdzFile.readAsBytes(),
+                headers: {
+                  'Content-Type':
+                      'model/vnd.usdz+zip', // critical for Quick Look
+                  'Access-Control-Allow-Origin': '*',
+                  'Access-Control-Allow-Methods': 'GET,HEAD,OPTIONS',
+                },
+              );
+            default:
+              return shelf.Response.notFound(
+                'Not found',
+                headers: {
+                  'Access-Control-Allow-Origin': '*',
+                  'Access-Control-Allow-Methods': 'GET,HEAD,OPTIONS',
+                },
+              );
+          }
+        });
 
     final server = await shelf_io.serve(handler, '127.0.0.1', 8080);
+    final base = 'http://${server.address.host}:${server.port}';
+
     setState(() {
-      localUrl = 'http://${server.address.host}:${server.port}/model';
+      _glbUrl = '$base/saw.glb';
+      _usdzUrl = '$base/saw.usdz';
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final ready = _glbUrl != null && _usdzUrl != null;
+    final isAndroid = Platform.isAndroid;
+
+    final srcForPlatform =
+        isAndroid && kAndroidGlbHttps != null
+            ? kAndroidGlbHttps!
+            : (_glbUrl ?? '');
+
     return Scaffold(
       appBar: AppBar(title: const Text('3D Model Viewer')),
       body:
-          localUrl == null
+          !ready
               ? const Center(child: CircularProgressIndicator())
               : Column(
                 children: [
                   Expanded(
                     child: ModelViewer(
-                      src: localUrl!,
+                      src: srcForPlatform, // GLB inline
                       alt: '3D Model',
                       ar: true,
-                      arModes: const ['scene-viewer', 'webxr', 'quick-look'],
+                      arModes: const ['quick-look', 'webxr', 'scene-viewer'],
+                      iosSrc: _usdzUrl!, // USDZ for iOS Quick Look
                       autoRotate: true,
                       cameraControls: true,
                       backgroundColor: Colors.white,
@@ -88,9 +159,7 @@ class _ModelViewerPageState extends State<ModelViewerPage> {
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        Get.toNamed(MyRoutes.modelViewer3D);
-                      },
+                      onPressed: () => Get.toNamed(MyRoutes.modelViewer3D),
                       icon: const Icon(Icons.map),
                       label: const Text('Go to Layout Screen'),
                     ),
@@ -101,7 +170,7 @@ class _ModelViewerPageState extends State<ModelViewerPage> {
   }
 }
 
-// ✅ This can run in isolate — platform stuff already done
+// ✅ Works in isolate — no platform channels here
 Future<File> _writeFileIsolate(Map<String, dynamic> args) async {
   final List<int> bytes = args['bytes'];
   final String path = args['path'];
