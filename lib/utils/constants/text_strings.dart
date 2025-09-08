@@ -98,6 +98,7 @@ class MyTexts {
 
   static const String modelEditorrTitle = "Layout Editor";
   static const String saw = "Segatrice";
+  static const String drill = "Foratrice";
   static const String standardModel = "Modello Standard";
   // Profile
   static const String settingScreenTitle = "Impostazioni";

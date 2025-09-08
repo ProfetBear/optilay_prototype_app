@@ -48,9 +48,6 @@ dependencies:
   # Chat Gpt suggested dependecies for OptiLay
   flutter_svg: ^2.0.10
   flutter_cached_pdfview: ^0.4.3
-  firebase_core: ^4.0.0
-  cloud_firestore: ^6.0.0
-  firebase_storage: ^13.0.0
   pdf: ^3.10.8
   file_picker: ^10.2.3
   # The following adds the Cupertino Icons font to your application.
@@ -86,6 +83,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/valiant_rev00.glb
     - assets/saw.glb
     - assets/saw.usdz
     - assets/default_model.glb
