@@ -45,7 +45,7 @@ class _SimpleScreenState extends State<SimpleScreen> {
               useAndroidViewSurface: false,
               borderRadius: const BorderRadius.all(Radius.circular(70)),
             ),
-            Positioned(
+            /*Positioned(
               bottom: 0,
               left: 0,
               right: 0,
@@ -73,7 +73,7 @@ class _SimpleScreenState extends State<SimpleScreen> {
                   ),
                 ),
               ),
-            ),
+            ),*/
           ],
         ),
       ),
