@@ -35,47 +35,9 @@ PODS:
   - file_picker (0.0.1):
     - DKImagePickerController/PhotoGallery
     - Flutter
-  - Firebase/CoreOnly (12.0.0):
-    - FirebaseCore (~> 12.0.0)
-  - Firebase/Storage (12.0.0):
-    - Firebase/CoreOnly
-    - FirebaseStorage (~> 12.0.0)
-  - firebase_core (4.0.0):
-    - Firebase/CoreOnly (= 12.0.0)
-    - Flutter
-  - firebase_storage (13.0.0):
-    - Firebase/Storage (= 12.0.0)
-    - firebase_core
-    - Flutter
-  - FirebaseAppCheckInterop (12.0.0)
-  - FirebaseAuthInterop (12.0.0)
-  - FirebaseCore (12.0.0):
-    - FirebaseCoreInternal (~> 12.0.0)
-    - GoogleUtilities/Environment (~> 8.1)
-    - GoogleUtilities/Logger (~> 8.1)
-  - FirebaseCoreExtension (12.0.0):
-    - FirebaseCore (~> 12.0.0)
-  - FirebaseCoreInternal (12.0.0):
-    - "GoogleUtilities/NSData+zlib (~> 8.1)"
-  - FirebaseStorage (12.0.0):
-    - FirebaseAppCheckInterop (~> 12.0.0)
-    - FirebaseAuthInterop (~> 12.0.0)
-    - FirebaseCore (~> 12.0.0)
-    - FirebaseCoreExtension (~> 12.0.0)
-    - GoogleUtilities/Environment (~> 8.1)
-    - GTMSessionFetcher/Core (< 6.0, >= 3.4)
   - Flutter (1.0.0)
   - flutter_pdfview (1.0.2):
     - Flutter
-  - GoogleUtilities/Environment (8.1.0):
-    - GoogleUtilities/Privacy
-  - GoogleUtilities/Logger (8.1.0):
-    - GoogleUtilities/Environment
-    - GoogleUtilities/Privacy
-  - "GoogleUtilities/NSData+zlib (8.1.0)":
-    - GoogleUtilities/Privacy
-  - GoogleUtilities/Privacy (8.1.0)
-  - GTMSessionFetcher/Core (5.0.0)
   - path_provider_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
@@ -99,8 +61,6 @@ PODS:
 DEPENDENCIES:
   - connectivity_plus (from `.symlinks/plugins/connectivity_plus/ios`)
   - file_picker (from `.symlinks/plugins/file_picker/ios`)
-  - firebase_core (from `.symlinks/plugins/firebase_core/ios`)
-  - firebase_storage (from `.symlinks/plugins/firebase_storage/ios`)
   - Flutter (from `Flutter`)
   - flutter_pdfview (from `.symlinks/plugins/flutter_pdfview/ios`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
@@ -114,15 +74,6 @@ SPEC REPOS:
   trunk:
     - DKImagePickerController
     - DKPhotoGallery
-    - Firebase
-    - FirebaseAppCheckInterop
-    - FirebaseAuthInterop
-    - FirebaseCore
-    - FirebaseCoreExtension
-    - FirebaseCoreInternal
-    - FirebaseStorage
-    - GoogleUtilities
-    - GTMSessionFetcher
     - SDWebImage
     - SwiftyGif
 
@@ -131,10 +82,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/connectivity_plus/ios"
   file_picker:
     :path: ".symlinks/plugins/file_picker/ios"
-  firebase_core:
-    :path: ".symlinks/plugins/firebase_core/ios"
-  firebase_storage:
-    :path: ".symlinks/plugins/firebase_storage/ios"
   Flutter:
     :path: Flutter
   flutter_pdfview:
@@ -157,19 +104,8 @@ SPEC CHECKSUMS:
   DKImagePickerController: 946cec48c7873164274ecc4624d19e3da4c1ef3c
   DKPhotoGallery: b3834fecb755ee09a593d7c9e389d8b5d6deed60
   file_picker: a0560bc09d61de87f12d246fc47d2119e6ef37be
-  Firebase: 800d487043c0557d9faed71477a38d9aafb08a41
-  firebase_core: 633e1851ffe1b9ab875f6467a4f574c79cef02e4
-  firebase_storage: 5063abf1ea47bad3df367f24314f4cc6c61a1e16
-  FirebaseAppCheckInterop: c848d06a04030c9858ef0ae555b82035dbe470d0
-  FirebaseAuthInterop: 002da671896af5e8879ae117dc604ed240b86e80
-  FirebaseCore: 055f4ab117d5964158c833f3d5e7ec6d91648d4a
-  FirebaseCoreExtension: 639afb3de6abd611952be78a794c54a47fa0f361
-  FirebaseCoreInternal: dedc28e569a4be85f38f3d6af1070a2e12018d55
-  FirebaseStorage: 5603c913805b0eacc8e6853395e837ca5742e5f7
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
   flutter_pdfview: 32bf27bda6fd85b9dd2c09628a824df5081246cf
-  GoogleUtilities: 00c88b9a86066ef77f0da2fab05f65d7768ed8e1
-  GTMSessionFetcher: 02d6e866e90bc236f48a703a041dfe43e6221a29
   path_provider_foundation: 080d55be775b7414fd5a5ef3ac137b97b097e564
   pdfx: 77f4dddc48361fbb01486fa2bdee4532cbb97ef3
   printing: 54ff03f28fe9ba3aa93358afb80a8595a071dd07
