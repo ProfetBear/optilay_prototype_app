@@ -41,10 +41,11 @@ dependencies:
 
   # Viewer 3D
   url_launcher: ^6.3.0
-
   model_viewer_plus: ^1.9.3
   shelf: ^1.4.1  # ✅ add this
 
+  arkit_plugin: ^1.2.1
+  vector_math: ^2.2.0
   # Chat Gpt suggested dependecies for OptiLay
   flutter_svg: ^2.0.10
   flutter_cached_pdfview: ^0.4.3

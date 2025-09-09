@@ -112,7 +112,7 @@ class _ModelViewerPageState extends State<ModelViewerPage> {
                     bottom: 20,
                     right: 20,
                     child: ElevatedButton.icon(
-                      onPressed: () => Get.toNamed(MyRoutes.modelViewer3D),
+                      onPressed: () => Get.toNamed(MyRoutes.modelViewerAR),
                       icon: const Icon(Icons.map),
                       label: const Text('AR'),
                     ),

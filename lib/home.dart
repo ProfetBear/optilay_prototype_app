@@ -48,6 +48,17 @@ class MyHomePage extends StatelessWidget {
                 Get.toNamed(MyRoutes.layoutProjectSelector);
               },
             ),
+
+            const SizedBox(height: 20),
+            OptionCard(
+              title: 'AR',
+              description: 'AR Test',
+              icon: Icons.design_services,
+              color: MyColors.secondary,
+              onTap: () {
+                Get.toNamed(MyRoutes.modelViewerAR);
+              },
+            ),
           ],
         ),
       ),
