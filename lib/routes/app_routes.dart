@@ -66,7 +66,8 @@ class AppRoutes {
       },
     ),
     // routes.dart
-    GetPage(name: MyRoutes.modelViewerAR, page: () => LoadGltfOrGlbFilePage()),
+    //OLD GetPage(name: MyRoutes.modelViewerAR, page: () => LoadGltfOrGlbFilePage()),
+    GetPage(name: MyRoutes.modelViewerAR, page: () => ManipulationPage()),
     // -- TODO Authentication
     /*
     GetPage(

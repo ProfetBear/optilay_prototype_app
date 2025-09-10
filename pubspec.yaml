@@ -64,6 +64,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  collection: ^1.18.0  # or latest
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -90,6 +91,10 @@ flutter:
     - assets/default_model.glb
     - assets/default_model.usdz
     - assets/crane.svg
+    - assets/ValiantRev11.glb
+    - assets/ValiantRev11_WithoutHull.glb
+    - assets/XBlade_Rev0.glb
+    - assets/XBladeRev0_WithoutHull.glb
     
   # To add assets to your application, add an assets section, like this:
   # assets:
