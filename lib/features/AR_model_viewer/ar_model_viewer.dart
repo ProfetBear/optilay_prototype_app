@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:arkit_plugin/arkit_plugin.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:vector_math/vector_math_64.dart' as vector;
 
 class ManipulationPage extends StatefulWidget {
@@ -13,13 +14,17 @@ class ManipulationPage extends StatefulWidget {
 class _ManipulationPageState extends State<ManipulationPage> {
   late ARKitController arkitController;
 
-  // We use a container anchored in world space; the GLB is a child of this.
+  // World-anchored container; GLB is a child of this
   ARKitNode? containerNode;
   ARKitGltfNode? glbNode;
 
   // Gesture baselines
-  vector.Vector3? _panBasePosition; // container position at gesture start
-  double? _rotationBaseYaw; // container yaw at gesture start
+  vector.Vector3? _panBasePosition;
+  double? _rotationBaseYaw;
+
+  // Plane visualization & UI state
+  bool _hasAnyPlane = false;
+  final Map<String, _PlaneViz> _planes = {}; // anchorId -> viz data
 
   @override
   void dispose() {
@@ -28,23 +33,64 @@ class _ManipulationPageState extends State<ManipulationPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Manipulation Sample')),
-    body: ARKitSceneView(
-      planeDetection: ARPlaneDetection.horizontal, // detect horizontal plane
-      showFeaturePoints: true,
-      enableTapRecognizer: true, // tap to place
-      enablePinchRecognizer: true, // pinch to scale
-      enablePanRecognizer: true, // 1-finger pan
-      enableRotationRecognizer: true, // 2-finger rotate
-      onARKitViewCreated: onARKitViewCreated,
-    ),
-  );
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Manipulation Sample')),
+      body: Stack(
+        children: [
+          ARKitSceneView(
+            planeDetection: ARPlaneDetection.horizontal,
+            showFeaturePoints: true,
+            enableTapRecognizer: true,
+            enablePinchRecognizer: true,
+            enablePanRecognizer: true,
+            enableRotationRecognizer: true,
+            onARKitViewCreated: onARKitViewCreated,
+          ),
+
+          // Overlay banner to indicate plane detection status
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 24,
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 250),
+              opacity: 1.0,
+              child:
+                  _hasAnyPlane
+                      ? _Banner(
+                        color: Colors.green.withOpacity(0.9),
+                        text:
+                            'Plane detected — tap to place, then drag/rotate/pinch',
+                        icon: Icons.grid_on,
+                      )
+                      : _Banner(
+                        color: Colors.black.withOpacity(0.7),
+                        text: 'Move your device to detect a horizontal surface',
+                        icon: Icons.phone_iphone,
+                      ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   void onARKitViewCreated(ARKitController controller) {
     arkitController = controller;
 
-    // TAP: place container at the world-space plane hit, add (or move) the GLB
+    // --- Plane anchor callbacks to visualize & track status ---
+    arkitController.onAddNodeForAnchor = (anchor) {
+      if (anchor is! ARKitPlaneAnchor) return;
+      _addPlaneViz(anchor);
+    };
+
+    arkitController.onUpdateNodeForAnchor = (anchor) {
+      if (anchor is! ARKitPlaneAnchor) return;
+      _updatePlaneViz(anchor);
+    };
+
+    // --- Tap to place / move at world point on plane ---
     arkitController.onARTap = (hits) {
       ARKitTestResult? planeHit;
       for (final h in hits) {
@@ -57,14 +103,15 @@ class _ManipulationPageState extends State<ManipulationPage> {
       _placeAtWorldPoint(planeHit.worldTransform);
     };
 
-    // PINCH: scale the GLB (not the container)
+    // --- Gestures ---
+    // Pinch -> scale GLB
     arkitController.onNodePinch = (events) {
       if (glbNode == null || events.isEmpty) return;
       final s = events.first.scale.clamp(0.01, 10.0);
       glbNode!.scale = vector.Vector3.all(s);
     };
 
-    // ROTATE (two-finger twist): yaw around Y on the container
+    // Two-finger twist -> yaw container
     arkitController.onNodeRotation = (events) {
       if (containerNode == null || events.isEmpty) return;
       final delta = events.first.rotation; // radians since gesture start
@@ -79,45 +126,87 @@ class _ManipulationPageState extends State<ManipulationPage> {
       );
     };
 
-    // PAN (one finger): translate the container in X/Z (keep Y)
+    // One-finger drag -> translate container in X/Z
     arkitController.onNodePan = (events) {
       if (containerNode == null || events.isEmpty) return;
       final t = events.first.translation; // Vector2 delta since gesture start
-
-      // New gesture if delta ~ 0
       if (_panBasePosition == null || (t.x * t.x + t.y * t.y) < 1e-8) {
         _panBasePosition = containerNode!.position;
       }
-
-      const dragSensitivity = 0.0015; // tune to taste
+      const dragSensitivity = 0.0015;
       final dx = t.x * dragSensitivity;
       final dz = t.y * dragSensitivity;
-
       containerNode!.position = vector.Vector3(
         _panBasePosition!.x + dx,
-        _panBasePosition!.y, // lock height
+        _panBasePosition!.y,
         _panBasePosition!.z + dz,
       );
     };
   }
 
-  // Place/move using a WORLD transform (stable in room space).
-  void _placeAtWorldPoint(Matrix4 world) async {
+  // ---------- Plane visualization helpers ----------
+
+  void _addPlaneViz(ARKitPlaneAnchor anchor) {
+    final plane = ARKitPlane(
+      width: anchor.extent.x,
+      height: anchor.extent.z,
+      materials: [
+        ARKitMaterial(
+          // Semi-transparent grid look
+          transparency: 0.35,
+          diffuse: ARKitMaterialProperty.color(Colors.white),
+        ),
+      ],
+    );
+
+    final node = ARKitNode(
+      name: 'plane_${anchor.identifier}',
+      geometry: plane,
+      position: vector.Vector3(anchor.center.x, 0, anchor.center.z),
+      // Rotate plane geometry to lie flat (SceneKit plane is vertical by default)
+      rotation: vector.Vector4(1, 0, 0, -math.pi / 2),
+    );
+
+    arkitController.add(node, parentNodeName: anchor.nodeName);
+
+    // First plane? set flag + haptic
+    final wasNone = !_hasAnyPlane;
+    _planes[anchor.identifier] = _PlaneViz(plane: plane, node: node);
+    if (wasNone) {
+      setState(() => _hasAnyPlane = true);
+      HapticFeedback.mediumImpact();
+    }
+  }
+
+  void _updatePlaneViz(ARKitPlaneAnchor anchor) {
+    final viz = _planes[anchor.identifier];
+    if (viz == null) return;
+
+    // Update size & position as ARKit refines the plane
+    viz.plane.width.value = anchor.extent.x;
+    viz.plane.height.value = anchor.extent.z;
+    viz.node.position = vector.Vector3(anchor.center.x, 0, anchor.center.z);
+  }
+
+  // ---------- Placement & scaling ----------
+
+  // Place/move using WORLD transform (stable in room space).
+  Future<void> _placeAtWorldPoint(Matrix4 world) async {
     final pos = vector.Vector3(
       world.getColumn(3).x,
       world.getColumn(3).y,
       world.getColumn(3).z,
     );
 
-    // Create or move container at the world point
+    // Create or move container
     if (containerNode == null) {
       containerNode = ARKitNode(name: 'model_container', position: pos);
-      await arkitController.add(containerNode!); // add to scene root
+      await arkitController.add(containerNode!);
     } else {
       containerNode!.position = pos;
     }
 
-    // Create GLB once as a child of the container (local origin)
+    // Create GLB once as child of container
     if (glbNode == null) {
       glbNode = ARKitGltfNode(
         name: 'DES66672-REV02 MXXXXX SZOVIKER',
@@ -128,18 +217,15 @@ class _ManipulationPageState extends State<ManipulationPage> {
         scale: vector.Vector3.all(0.01), // start small
       );
       await arkitController.add(glbNode!, parentNodeName: containerNode!.name);
-      _autoScaleToLargest(
-        glbNode!,
-        targetLargestDimensionMeters: 0.7,
-      ); // optional
+      _autoScaleToLargest(glbNode!, targetLargestDimensionMeters: 0.7);
     }
 
-    // Reset gesture baselines on fresh placement
+    // Reset gesture baselines
     _panBasePosition = null;
     _rotationBaseYaw = containerNode!.eulerAngles.y;
   }
 
-  // Scale very large/small assets to a reasonable size (helps stability).
+  // Auto-scale very large/small models to ~target size.
   void _autoScaleToLargest(
     ARKitGltfNode node, {
     double targetLargestDimensionMeters = 0.6,
@@ -165,7 +251,44 @@ class _ManipulationPageState extends State<ManipulationPage> {
           node.scale = vector.Vector3(s, s, s);
         })
         .catchError((_) {
-          // ignore if bounding box isn't available yet
+          // ignore if bounding box isn't ready yet
         });
+  }
+}
+
+// Small helper for plane viz bookkeeping
+class _PlaneViz {
+  _PlaneViz({required this.plane, required this.node});
+  final ARKitPlane plane;
+  final ARKitNode node;
+}
+
+// Simple pill banner widget
+class _Banner extends StatelessWidget {
+  const _Banner({required this.color, required this.text, required this.icon});
+
+  final Color color;
+  final String text;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: Colors.white),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Text(text, style: const TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 }
