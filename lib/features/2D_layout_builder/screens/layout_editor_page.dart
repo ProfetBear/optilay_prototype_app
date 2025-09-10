@@ -86,12 +86,11 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
     }
   }
 
-  // Maps a viewport (screen) point into the canvas (scene) coordinates.
+  // Map a viewport (screen) point into the canvas (scene) coordinates.
   Offset _viewportToScene(Offset viewportPoint) {
     final matrix = viewerController.value;
     final inverse = Matrix4.inverted(matrix);
-    final scenePoint = MatrixUtils.transformPoint(inverse, viewportPoint);
-    return scenePoint;
+    return MatrixUtils.transformPoint(inverse, viewportPoint);
   }
 
   @override
@@ -110,13 +109,9 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final viewportSize = Size(
-            constraints.maxWidth,
-            constraints.maxHeight,
-          );
-
           return Stack(
             children: [
+              // ---------- Canvas with zoom/pan ----------
               InteractiveViewer(
                 transformationController: viewerController,
                 minScale: 0.5,
@@ -140,8 +135,9 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
                             ),
                           ),
 
-                        // Placed machinery (built from model list)
+                        // Placed machinery
                         ...controller.buildPlacedMachineryWidgets(),
+
                         // Quoting tool (interactive)
                         if (controller.quotingMode.value)
                           Positioned(
@@ -222,10 +218,8 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
                 ),
               ),
 
-              // ---- Placement HUD (overlay) ----
-              // Appears when a machinery is being staged. It is drawn in viewport
-              // coordinates (on top of the InteractiveViewer) so the user can pan/zoom
-              // the canvas underneath to position the machinery relatively.
+              // ---------- Placement HUD: centered preview ONLY ----------
+              // Important: IgnorePointer(ignoring: true) so it NEVER blocks pan/zoom.
               Obx(() {
                 final staged = controller.stagingItem.value;
                 if (staged == null) return const SizedBox.shrink();
@@ -233,63 +227,16 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
                 final px = controller.pixelSizeFor(staged.realWorldSize);
                 return Positioned.fill(
                   child: IgnorePointer(
-                    ignoring:
-                        false, // allow taps to pass except on our HUD area
-                    child: Stack(
-                      children: [
-                        // Guidance banner
-                        Positioned(
-                          left: 16,
-                          right: 16,
-                          top: 16,
-                          child: Material(
-                            color: Colors.black.withOpacity(0.55),
-                            borderRadius: BorderRadius.circular(12),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              child: Text(
-                                controller.scaleSet.value
-                                    ? 'Drag the canvas to line up the machinery, then press Confirm.'
-                                    : 'You can pan/zoom. Import a PDF and set a scale to use real sizing.',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ),
+                    ignoring: true, // let gestures pass to InteractiveViewer
+                    child: Center(
+                      child: Opacity(
+                        opacity: 0.95,
+                        child: SizedBox(
+                          width: px,
+                          height: px,
+                          child: controller.buildSvgFor(staged),
                         ),
-
-                        // Centered preview "ghost" + crosshair
-                        Center(
-                          child: IgnorePointer(
-                            ignoring: true,
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                // crosshair
-                                CustomPaint(
-                                  size: Size(px + 40, px + 40),
-                                  painter: _CrosshairPainter(),
-                                ),
-                                // ghost machinery preview
-                                Opacity(
-                                  opacity: 0.9,
-                                  child: SizedBox(
-                                    width: px,
-                                    height: px,
-                                    child: controller.buildSvgFor(staged),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 );
@@ -298,7 +245,8 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
           );
         },
       ),
-      // ---- FABs ----
+
+      // ---------- FABs ----------
       floatingActionButton: Obx(() {
         // Quoting Mode: ask for real-world length
         if (controller.quotingMode.value) {
@@ -320,17 +268,15 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
                 icon: const Icon(Icons.check),
                 label: const Text('Confirm'),
                 onPressed: () {
-                  // Convert viewport center to scene coordinate
-                  final renderBox = context.findRenderObject() as RenderBox?;
-                  if (renderBox == null) return;
-
-                  final viewportSize = renderBox.size;
+                  // Put item at the scene point under the viewport center
+                  final box = context.findRenderObject() as RenderBox?;
+                  if (box == null) return;
+                  final size = box.size;
                   final centerViewport = Offset(
-                    viewportSize.width / 2,
-                    viewportSize.height / 2,
+                    size.width / 2,
+                    size.height / 2,
                   );
                   final scenePoint = _viewportToScene(centerViewport);
-
                   controller.confirmPlacementAtSceneCenter(
                     scenePoint: scenePoint,
                   );
@@ -353,7 +299,6 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
           icon: const Icon(Icons.add),
           label: const Text(MyTexts.addMachinery),
           onPressed: () {
-            // You can swap these params with a picker later
             controller.startAddMachinery(
               assetPath: 'assets/crane.svg',
               realWorldSizeMeters: 2.0,
@@ -363,40 +308,4 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
       }),
     );
   }
-}
-
-// Simple crosshair painter for the placement HUD
-class _CrosshairPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint =
-        Paint()
-          ..color = Colors.black54
-          ..strokeWidth = 1;
-
-    final cx = size.width / 2;
-    final cy = size.height / 2;
-
-    // Outer box (light)
-    final boxPaint =
-        Paint()
-          ..color = Colors.black26
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1;
-    canvas.drawRect(
-      Rect.fromCenter(
-        center: Offset(cx, cy),
-        width: size.width,
-        height: size.height,
-      ),
-      boxPaint,
-    );
-
-    // Crosshair lines
-    canvas.drawLine(Offset(cx, 0), Offset(cx, size.height), paint);
-    canvas.drawLine(Offset(0, cy), Offset(size.width, cy), paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
