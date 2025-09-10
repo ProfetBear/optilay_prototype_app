@@ -76,7 +76,6 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
       ),
     );
 
-    // Delay disposal to avoid controller-use-after-dispose error
     WidgetsBinding.instance.addPostFrameCallback((_) {
       inputController.dispose();
     });
@@ -91,6 +90,12 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
     final matrix = viewerController.value;
     final inverse = Matrix4.inverted(matrix);
     return MatrixUtils.transformPoint(inverse, viewportPoint);
+  }
+
+  // Current zoom factor applied by InteractiveViewer (uniform).
+  double _currentZoom() {
+    // Matrix4.getMaxScaleOnAxis() is available in vector_math.
+    return viewerController.value.getMaxScaleOnAxis();
   }
 
   @override
@@ -135,7 +140,7 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
                             ),
                           ),
 
-                        // Placed machinery
+                        // Placed machinery (transformed by InteractiveViewer)
                         ...controller.buildPlacedMachineryWidgets(),
 
                         // Quoting tool (interactive)
@@ -218,22 +223,26 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
                 ),
               ),
 
-              // ---------- Placement HUD: centered preview ONLY ----------
-              // Important: IgnorePointer(ignoring: true) so it NEVER blocks pan/zoom.
+              // ---------- Placement HUD: centered preview that scales with zoom ----------
+              // IgnorePointer so it NEVER blocks pan/zoom.
               Obx(() {
                 final staged = controller.stagingItem.value;
                 if (staged == null) return const SizedBox.shrink();
 
-                final px = controller.pixelSizeFor(staged.realWorldSize);
+                final scenePixels = controller.pixelSizeFor(
+                  staged.realWorldSize,
+                );
+                final screenPixels = scenePixels * _currentZoom();
+
                 return Positioned.fill(
                   child: IgnorePointer(
-                    ignoring: true, // let gestures pass to InteractiveViewer
+                    ignoring: true,
                     child: Center(
-                      child: Opacity(
-                        opacity: 0.95,
-                        child: SizedBox(
-                          width: px,
-                          height: px,
+                      child: SizedBox(
+                        width: screenPixels,
+                        height: screenPixels,
+                        child: Opacity(
+                          opacity: 0.95,
                           child: controller.buildSvgFor(staged),
                         ),
                       ),
@@ -248,7 +257,7 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
 
       // ---------- FABs ----------
       floatingActionButton: Obx(() {
-        // Quoting Mode: ask for real-world length
+        // Quoting Mode
         if (controller.quotingMode.value) {
           return FloatingActionButton.extended(
             icon: const Icon(Icons.straighten),

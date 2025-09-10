@@ -17,22 +17,27 @@ class MachineryItem {
   final String assetPath;
   final double realWorldSize; // meters (desired real size)
   final Offset position; // top-left in canvas (scene) coordinates
+  final bool
+  placedWithoutScale; // true if it was confirmed before scale was set
 
   MachineryItem({
     required this.assetPath,
     required this.realWorldSize,
     required this.position,
+    this.placedWithoutScale = false,
   });
 
   MachineryItem copyWith({
     String? assetPath,
     double? realWorldSize,
     Offset? position,
+    bool? placedWithoutScale,
   }) {
     return MachineryItem(
       assetPath: assetPath ?? this.assetPath,
       realWorldSize: realWorldSize ?? this.realWorldSize,
       position: position ?? this.position,
+      placedWithoutScale: placedWithoutScale ?? this.placedWithoutScale,
     );
   }
 }
@@ -41,9 +46,6 @@ class LayoutEditorController extends GetxController {
   // Background (PDF imported as image)
   final importedLayotImage = Rxn<Uint8List>();
 
-  // Check if it is woth exporting (i.e. has content):
-  bool get canExport => items.isNotEmpty || overlayWidgets.isNotEmpty;
-
   // Placed machinery (on canvas)
   final items = <MachineryItem>[].obs;
 
@@ -51,8 +53,7 @@ class LayoutEditorController extends GetxController {
   final stagingItem = Rxn<MachineryItem>();
 
   // Scaling / quoting
-  final referenceScale =
-      1.0.obs; // meters-per-pixel; set by setReferenceScale; default 1 m/px.
+  final referenceScale = 1.0.obs; // meters-per-pixel
   final scaleSet = false.obs;
 
   final quotePosition = const Offset(100, 100).obs;
@@ -61,6 +62,9 @@ class LayoutEditorController extends GetxController {
   final realMeasurementLabel = ''.obs;
 
   void toggleQuotingMode(bool state) => quotingMode.value = state;
+
+  // Optional overlay widgets (like the permanent quote)
+  final overlayWidgets = <Widget>[].obs;
 
   // == Import PDF ==
   Future<void> importPdfAsCanvas() async {
@@ -105,7 +109,6 @@ class LayoutEditorController extends GetxController {
     toggleQuotingMode(false);
 
     // Put a permanent (non-interactive) quote line on the canvas
-    // (purely visual; does not affect placement)
     final visualQuote = Positioned(
       left: quotePosition.value.dx,
       top: quotePosition.value.dy,
@@ -125,12 +128,19 @@ class LayoutEditorController extends GetxController {
     );
     overlayWidgets.add(visualQuote);
 
-    // If we are staging an item, keep staging — its preview will resize automatically
-    // because pixelSizeFor() uses the updated referenceScale.
+    // If there is no currently staged item, but there ARE items that were placed
+    // before scale was set, pull the most recent one back into placement mode.
+    if (stagingItem.value == null) {
+      for (int i = items.length - 1; i >= 0; i--) {
+        final it = items[i];
+        if (it.placedWithoutScale) {
+          stagingItem.value = it.copyWith(); // preview will auto-resize
+          items.removeAt(i); // remove from fixed items; will re-confirm
+          break;
+        }
+      }
+    }
   }
-
-  // Optional overlay widgets (like the permanent quote)
-  final overlayWidgets = <Widget>[].obs;
 
   // == Start placement workflow ==
   void startAddMachinery({
@@ -140,11 +150,8 @@ class LayoutEditorController extends GetxController {
     stagingItem.value = MachineryItem(
       assetPath: assetPath,
       realWorldSize: realWorldSizeMeters,
-      position: Offset.zero, // position is decided on confirm
+      position: Offset.zero, // position decided on confirm
     );
-
-    // If no scale yet, we still allow staging; user can see/zoom/pan freely.
-    // Once scale is set later, the preview auto-resizes (pixelSizeFor).
   }
 
   // == Confirm placement at the current viewport center ==
@@ -153,10 +160,15 @@ class LayoutEditorController extends GetxController {
     if (staged == null) return;
 
     final px = pixelSizeFor(staged.realWorldSize);
-    // Store top-left so the visual center matches the viewport crosshair
+    // Store top-left so the visual center matches the viewport center
     final topLeft = scenePoint - Offset(px / 2, px / 2);
 
-    items.add(staged.copyWith(position: topLeft));
+    items.add(
+      staged.copyWith(
+        position: topLeft,
+        placedWithoutScale: !scaleSet.value, // mark if placed pre-scale
+      ),
+    );
 
     stagingItem.value = null;
   }
@@ -167,9 +179,9 @@ class LayoutEditorController extends GetxController {
 
   // == Size helper ==
   double pixelSizeFor(double realWorldMeters) {
-    // If scale is not set, fall back to a visible preview size
+    // If scale is not set, fall back to a visible size (scene pixels).
     if (!scaleSet.value) return 100.0;
-    // meters / (meters-per-pixel) => pixels
+    // meters / (meters-per-pixel) => scene pixels
     return realWorldMeters / referenceScale.value;
   }
 
@@ -195,6 +207,9 @@ class LayoutEditorController extends GetxController {
   Widget buildSvgFor(MachineryItem m) {
     return SvgPicture.asset(m.assetPath, fit: BoxFit.contain);
   }
+
+  // Convenience for the drawer
+  bool get canExport => items.isNotEmpty || overlayWidgets.isNotEmpty;
 
   // == Export ==
   Future<void> exportCanvasAsPdf(GlobalKey canvasKey) async {
