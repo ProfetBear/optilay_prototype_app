@@ -28,7 +28,7 @@ class ProjectSelectorPage extends StatelessWidget {
             ),
             const SizedBox(height: 32),
             OptionCard(
-              title: MyTexts.projectSelectorNewCanvaTitle,
+              title: MyTexts.newCanvaTitle,
               description: MyTexts.projectSelectorNewCanvaDesc,
               icon: Icons.add_circle_outline,
               color: MyColors.green,
