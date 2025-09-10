@@ -36,9 +36,9 @@ class MyPdfDrawer extends StatelessWidget {
               ListTile(
                 leading: const Icon(Icons.upload_file),
                 title: const Text("Export Layout as PDF"),
-                enabled: controller.placedSvgObjects.isNotEmpty,
+                enabled: controller.canExport,
                 onTap:
-                    controller.placedSvgObjects.isNotEmpty
+                    controller.canExport
                         ? () {
                           controller.exportCanvasAsPdf(canvasKey);
                           Navigator.pop(context);
