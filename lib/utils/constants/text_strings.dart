@@ -95,6 +95,7 @@ class MyTexts {
 
   // Layout Editor 2D
 
+  static const String layoutViewerTitle = "Layout Viewer";
   static const String layoutEditorTitle = "Layout Editor";
   static const String addMachinery = "Add Machinery";
 

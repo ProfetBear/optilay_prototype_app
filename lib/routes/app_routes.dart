@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/screens/layout_editor_page.dart';
+import 'package:optilay_prototype_app/features/2D_layout_builder/screens/layout_viewer_page.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/screens/new_canva_page.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/screens/project_selector_page.dart';
 import 'package:optilay_prototype_app/features/3D_model_viewer/3D_model_selector.dart';
@@ -30,6 +31,12 @@ class AppRoutes {
     GetPage(
       name: MyRoutes.layoutProjectSelector,
       page: () => ProjectSelectorPage(),
+      transition: Transition.fadeIn,
+      transitionDuration: Duration(milliseconds: 50),
+    ),
+    GetPage(
+      name: MyRoutes.layoutViewer2D,
+      page: () => LayoutViewerPage(),
       transition: Transition.fadeIn,
       transitionDuration: Duration(milliseconds: 50),
     ),

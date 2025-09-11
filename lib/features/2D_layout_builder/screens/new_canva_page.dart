@@ -32,9 +32,8 @@ class _NewCanvaPageState extends State<NewCanvaPage> {
       );
       return;
     }
-    final layoutId = LayoutIdGenerator.generate(1);
     // TODO: Logica per creare la canva o salvare su Firebase
-    Get.toNamed('/layout_editor/$layoutId', arguments: {'canvaName': name});
+    Get.toNamed('/layout_viewer', arguments: {'canvaName': name});
   }
 
   @override
@@ -75,13 +74,5 @@ class _NewCanvaPageState extends State<NewCanvaPage> {
         ),
       ),
     );
-  }
-}
-
-class LayoutIdGenerator {
-  static String generate(int count, {int revision = 0}) {
-    final id = count.toString().padLeft(5, '0');
-    final rev = revision.toString().padLeft(2, '0');
-    return 'LAY$id.rev$rev';
   }
 }
