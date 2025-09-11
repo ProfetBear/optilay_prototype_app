@@ -224,32 +224,38 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
               ),
 
               // ---------- Placement HUD: centered preview that scales with zoom ----------
-              // IgnorePointer so it NEVER blocks pan/zoom.
-              Obx(() {
-                final staged = controller.stagingItem.value;
-                if (staged == null) return const SizedBox.shrink();
+              AnimatedBuilder(
+                animation: viewerController, // listens to pan/zoom changes
+                builder: (_, __) {
+                  final staged = controller.stagingItem.value;
+                  if (staged == null) return const SizedBox.shrink();
 
-                final scenePixels = controller.pixelSizeFor(
-                  staged.realWorldSize,
-                );
-                final screenPixels = scenePixels * _currentZoom();
+                  // Size in scene pixels based on your quote scale
+                  final scenePixels = controller.pixelSizeFor(
+                    staged.realWorldSize,
+                  );
 
-                return Positioned.fill(
-                  child: IgnorePointer(
-                    ignoring: true,
-                    child: Center(
-                      child: SizedBox(
-                        width: screenPixels,
-                        height: screenPixels,
-                        child: Opacity(
-                          opacity: 0.95,
-                          child: controller.buildSvgFor(staged),
+                  // Current zoom from the InteractiveViewer matrix
+                  final zoom = viewerController.value.getMaxScaleOnAxis();
+                  final screenPixels = scenePixels * zoom;
+
+                  return Positioned.fill(
+                    child: IgnorePointer(
+                      ignoring: true,
+                      child: Center(
+                        child: SizedBox(
+                          width: screenPixels,
+                          height: screenPixels,
+                          child: Opacity(
+                            opacity: 0.95,
+                            child: controller.buildSvgFor(staged),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                );
-              }),
+                  );
+                },
+              ),
             ],
           );
         },
