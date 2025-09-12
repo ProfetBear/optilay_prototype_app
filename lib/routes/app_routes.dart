@@ -4,6 +4,7 @@ import 'package:optilay_prototype_app/features/2D_layout_builder/screens/new_can
 import 'package:optilay_prototype_app/features/2D_layout_builder/screens/project_selector_page.dart';
 import 'package:optilay_prototype_app/features/3D_model_viewer/3D_model_selector.dart';
 import 'package:optilay_prototype_app/features/3D_model_viewer/3D_model_viewer.dart';
+import 'package:optilay_prototype_app/features/AR_model_viewer/ar_model_viewer.dart';
 import 'package:optilay_prototype_app/home.dart';
 import 'package:optilay_prototype_app/utils/constants/text_strings.dart';
 import 'routes.dart';
@@ -64,7 +65,9 @@ class AppRoutes {
         );
       },
     ),
-
+    // routes.dart
+    //OLD GetPage(name: MyRoutes.modelViewerAR, page: () => LoadGltfOrGlbFilePage()),
+    GetPage(name: MyRoutes.modelViewerAR, page: () => ManipulationPage()),
     // -- TODO Authentication
     /*
     GetPage(

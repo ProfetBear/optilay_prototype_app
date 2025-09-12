@@ -1,19 +1,17 @@
 // lib/screens/model_viewer_screen.dart
-
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:model_viewer_plus/model_viewer_plus.dart';
-import 'package:flutter/services.dart';
 import 'package:optilay_prototype_app/routes/routes.dart';
-import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
-import 'package:flutter/foundation.dart';
 
 class ModelViewerPage extends StatefulWidget {
-  final String filename;
-
+  final String filename; // e.g. 'assets/saw.glb'
   const ModelViewerPage({super.key, required this.filename});
 
   @override
@@ -21,78 +19,102 @@ class ModelViewerPage extends StatefulWidget {
 }
 
 class _ModelViewerPageState extends State<ModelViewerPage> {
-  String? localUrl;
+  String? _glbUrl; // http://127.0.0.1:<port>/saw.glb
+  HttpServer? _server;
+  bool _starting = false;
 
   @override
   void initState() {
     super.initState();
-    _prepareModel(widget.filename);
+    _prepareAndServe();
   }
 
-  Future<void> _prepareModel(String assetPath) async {
-    final byteData = await rootBundle.load(assetPath);
-    final fileBytes = byteData.buffer.asUint8List();
-    final filename = assetPath.split('/').last;
-    final directory = await getApplicationDocumentsDirectory();
-    final filePath = '${directory.path}/$filename';
+  @override
+  void dispose() {
+    // Close the server so the port is freed when leaving the page.
+    _server?.close(force: true);
+    _server = null;
+    super.dispose();
+  }
 
-    // Pass only primitive types to isolate
-    final modelFile = await compute(_writeFileIsolate, {
-      'bytes': fileBytes,
-      'path': filePath,
-    });
+  Future<void> _prepareAndServe() async {
+    if (_starting || _server != null) return;
+    _starting = true;
 
-    final handler = shelf.Pipeline().addHandler((shelf.Request request) async {
-      if (request.url.path == 'model') {
-        final bytes = await modelFile.readAsBytes();
+    try {
+      final docs = await getApplicationDocumentsDirectory();
+
+      // ---- Copy GLB from assets to app docs ----
+      final glbData = await rootBundle.load(widget.filename);
+      final glbBytes = glbData.buffer.asUint8List();
+      final glbPath = '${docs.path}/saw.glb';
+      final glbFile = await compute(_writeFileIsolate, {
+        'bytes': glbBytes,
+        'path': glbPath,
+      });
+
+      final handler = shelf.Pipeline().addHandler((
+        shelf.Request request,
+      ) async {
+        final bytes = await glbFile.readAsBytes();
         return shelf.Response.ok(
           bytes,
           headers: {
-            'Content-Type': 'model/gltf+json',
+            'Content-Type': 'model/gltf-binary',
             'Access-Control-Allow-Origin': '*',
           },
         );
-      }
-      return shelf.Response.notFound(
-        'Not found',
-        headers: {'Access-Control-Allow-Origin': '*'},
+      });
+      // Bind to port 0 (let the OS pick a free one). No need for shared:true now.
+      _server = await shelf_io.serve(
+        handler,
+        InternetAddress.loopbackIPv4,
+        0,
+        // shared: true, // only if you truly need multiple listeners on the same port
       );
-    });
 
-    final server = await shelf_io.serve(handler, '127.0.0.1', 8080);
-    setState(() {
-      localUrl = 'http://${server.address.host}:${server.port}/model';
-    });
+      final base = 'http://${_server!.address.host}:${_server!.port}';
+
+      if (!mounted) return;
+      setState(() {
+        _glbUrl = '$base/saw.glb';
+      });
+    } finally {
+      _starting = false;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final ready = _glbUrl != null;
+    final srcForPlatform = (_glbUrl ?? '');
+
     return Scaffold(
-      appBar: AppBar(title: const Text('3D Model Viewer')),
+      appBar: AppBar(),
       body:
-          localUrl == null
+          !ready
               ? const Center(child: CircularProgressIndicator())
-              : Column(
+              : Stack(
                 children: [
-                  Expanded(
+                  // Expanded cannot be used inside Stack; use a direct child or Positioned.fill
+                  Positioned.fill(
                     child: ModelViewer(
-                      src: localUrl!,
+                      src: srcForPlatform,
                       alt: '3D Model',
                       ar: true,
-                      arModes: const ['scene-viewer', 'webxr', 'quick-look'],
+                      arModes: const ['quick-look', 'webxr', 'scene-viewer'],
                       autoRotate: true,
                       cameraControls: true,
                       backgroundColor: Colors.white,
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
+                  Positioned(
+                    bottom: 20,
+                    right: 20,
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        Get.toNamed(MyRoutes.modelViewer3D);
-                      },
+                      onPressed: () => Get.toNamed(MyRoutes.modelViewerAR),
                       icon: const Icon(Icons.map),
-                      label: const Text('Go to Layout Screen'),
+                      label: const Text('AR'),
                     ),
                   ),
                 ],
@@ -101,7 +123,7 @@ class _ModelViewerPageState extends State<ModelViewerPage> {
   }
 }
 
-// ✅ This can run in isolate — platform stuff already done
+// Works in isolate — no platform channels here
 Future<File> _writeFileIsolate(Map<String, dynamic> args) async {
   final List<int> bytes = args['bytes'];
   final String path = args['path'];

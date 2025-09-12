@@ -52,6 +52,19 @@ class ModelSelectorPage extends StatelessWidget {
                 );
               },
             ),
+            const SizedBox(height: 20),
+            OptionCard(
+              title: MyTexts.drill,
+              description: MyTexts.projectSelectorRestoreCanvaDesc,
+              icon: Icons.pin,
+              color: MyColors.blue,
+              onTap: () {
+                Get.toNamed(
+                  MyRoutes.modelViewer3D,
+                  parameters: {'assetPath': 'assets/valiant_rev00.glb'},
+                );
+              },
+            ),
           ],
         ),
       ),
