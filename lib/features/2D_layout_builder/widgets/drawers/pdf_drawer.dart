@@ -54,14 +54,21 @@ class MyPdfDrawer extends StatelessWidget {
                 title: const Text("Export Layout as PDF"),
                 enabled:
                     layout.items.isNotEmpty || layout.overlayWidgets.isNotEmpty,
+                // lib/features/2D_layout_builder/widgets/drawers/pdf_drawer.dart
+                // ...
                 onTap:
                     (layout.items.isNotEmpty ||
                             layout.overlayWidgets.isNotEmpty)
                         ? () async {
-                          await layout.exportCanvas(canvasKey);
+                          await layout.exportCanvasHighQuality(
+                            canvasKey,
+                            targetDpi: 300,
+                          );
                           if (context.mounted) Navigator.pop(context);
                         }
                         : null,
+
+                // ...
               ),
           ],
         ),
