@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
-import 'package:optilay_prototype_app/features/2D_layout_builder/widgets/pdf_drawer.dart';
-import 'package:optilay_prototype_app/utils/constants/text_strings.dart';
+import 'package:optilay_prototype_app/features/2D_layout_builder/data/pdf_export.dart';
+import 'package:optilay_prototype_app/features/2D_layout_builder/data/pdf_import.dart';
+import 'package:optilay_prototype_app/features/2D_layout_builder/data/pdf_picker.dart';
 
-import '../controllers/layout_editor_controller.dart';
-import '../widgets/quote_line_painter.dart';
+import 'package:optilay_prototype_app/utils/constants/text_strings.dart';
+import '../controllers/layout_controller.dart';
+import '../controllers/quote_controller.dart';
+import '../controllers/placement_controller.dart';
+
+// servizi IO per l'injection del LayoutController
+import '../widgets/painters/quote_line_painter.dart';
+import '../widgets/drawers/pdf_drawer.dart';
 
 class LayoutEditorPage extends StatefulWidget {
   const LayoutEditorPage({super.key});
@@ -14,7 +22,10 @@ class LayoutEditorPage extends StatefulWidget {
 }
 
 class _LayoutEditorPageState extends State<LayoutEditorPage> {
-  late final LayoutEditorController controller;
+  late final LayoutController layout;
+  late final QuoteController quote;
+  late final PlacementController place;
+
   final TransformationController viewerController = TransformationController();
   final GlobalKey _canvasKey = GlobalKey();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -22,7 +33,17 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
   @override
   void initState() {
     super.initState();
-    controller = Get.put(LayoutEditorController());
+
+    // Inietto i servizi nel LayoutController
+    layout = Get.put(
+      LayoutController(
+        PdfImportService(),
+        FilePickerService(),
+        ExportService(),
+      ),
+    );
+    quote = Get.put(QuoteController(layout));
+    place = Get.put(PlacementController(layout));
   }
 
   @override
@@ -81,21 +102,15 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
     });
 
     if (realLength != null) {
-      controller.setReferenceScale(realLength!);
+      quote.setRealLengthMeters(realLength!);
     }
   }
 
-  // Map a viewport (screen) point into the canvas (scene) coordinates.
+  // Mappa un punto viewport -> coordinate scena (per confermare il placement al centro)
   Offset _viewportToScene(Offset viewportPoint) {
     final matrix = viewerController.value;
     final inverse = Matrix4.inverted(matrix);
     return MatrixUtils.transformPoint(inverse, viewportPoint);
-  }
-
-  // Current zoom factor applied by InteractiveViewer (uniform).
-  double _currentZoom() {
-    // Matrix4.getMaxScaleOnAxis() is available in vector_math.
-    return viewerController.value.getMaxScaleOnAxis();
   }
 
   @override
@@ -116,7 +131,7 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
         builder: (context, constraints) {
           return Stack(
             children: [
-              // ---------- Canvas with zoom/pan ----------
+              // ---------- Canvas con zoom/pan ----------
               InteractiveViewer(
                 transformationController: viewerController,
                 minScale: 0.5,
@@ -126,64 +141,82 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
                     key: _canvasKey,
                     child: Stack(
                       children: [
-                        // Canvas background
+                        // Fondo canvas
                         Positioned.fill(
                           child: Container(color: Colors.grey.shade200),
                         ),
 
-                        // PDF background
-                        if (controller.importedLayotImage.value != null)
+                        // Background PDF importato (se presente)
+                        if (layout.importedLayoutImage.value != null)
                           Positioned.fill(
                             child: Image.memory(
-                              controller.importedLayotImage.value!,
+                              layout.importedLayoutImage.value!,
                               fit: BoxFit.contain,
                             ),
                           ),
 
-                        // Placed machinery (transformed by InteractiveViewer)
-                        ...controller.buildPlacedMachineryWidgets(),
+                        // Layer macchinari + overlay fissi
+                        ...[
+                          for (final m in layout.items)
+                            Positioned(
+                              left: m.topLeftScene.dx,
+                              top: m.topLeftScene.dy,
+                              child: SizedBox(
+                                width: layout.pixelSizeFor(
+                                  m.realWorldSizeMeters,
+                                ),
+                                height: layout.pixelSizeFor(
+                                  m.realWorldSizeMeters,
+                                ),
+                                child: SvgPicture.asset(
+                                  m.assetPath,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            ),
+                          ...layout.overlayWidgets,
+                        ],
 
-                        // Quoting tool (interactive)
-                        if (controller.quotingMode.value)
+                        // Strumento di quoting interattivo
+                        if (quote.quotingMode.value)
                           Positioned(
-                            left: controller.quotePosition.value.dx,
-                            top: controller.quotePosition.value.dy,
+                            left: quote.quotePosition.value.dx,
+                            top: quote.quotePosition.value.dy,
                             child: GestureDetector(
                               onPanUpdate: (details) {
-                                controller.quotePosition.value += details.delta;
+                                quote.quotePosition.value += details.delta;
                               },
                               child: Stack(
                                 alignment: Alignment.centerLeft,
                                 children: [
                                   SizedBox(
-                                    width: controller.quoteLength.value,
+                                    width: quote.quoteLengthPx.value,
                                     height: 30,
                                   ),
                                   CustomPaint(
                                     painter: QuotePainter(
-                                      controller.quoteLength.value,
-                                      label:
-                                          controller.realMeasurementLabel.value,
+                                      quote.quoteLengthPx.value,
+                                      label: quote.realLabel.value,
                                     ),
                                     child: SizedBox(
-                                      width: controller.quoteLength.value,
+                                      width: quote.quoteLengthPx.value,
                                       height: 30,
                                     ),
                                   ),
-                                  // Left handle
+                                  // Handle sinistro
                                   Positioned(
                                     left: -10,
                                     child: GestureDetector(
                                       onPanUpdate: (d) {
                                         final newLength =
-                                            controller.quoteLength.value -
+                                            quote.quoteLengthPx.value -
                                             d.delta.dx;
                                         if (newLength >= 50) {
-                                          controller.quoteLength.value =
-                                              newLength;
-                                          controller
-                                              .quotePosition
-                                              .value += Offset(d.delta.dx, 0);
+                                          quote.quoteLengthPx.value = newLength;
+                                          quote.quotePosition.value += Offset(
+                                            d.delta.dx,
+                                            0,
+                                          );
                                         }
                                       },
                                       behavior: HitTestBehavior.translucent,
@@ -193,17 +226,16 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
                                       ),
                                     ),
                                   ),
-                                  // Right handle
+                                  // Handle destro
                                   Positioned(
                                     right: -10,
                                     child: GestureDetector(
                                       onPanUpdate: (d) {
                                         final newLength =
-                                            controller.quoteLength.value +
+                                            quote.quoteLengthPx.value +
                                             d.delta.dx;
                                         if (newLength >= 50) {
-                                          controller.quoteLength.value =
-                                              newLength;
+                                          quote.quoteLengthPx.value = newLength;
                                         }
                                       },
                                       behavior: HitTestBehavior.translucent,
@@ -223,19 +255,16 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
                 ),
               ),
 
-              // ---------- Placement HUD: centered preview that scales with zoom ----------
+              // ---------- Placement HUD: anteprima centrata che scala con lo zoom ----------
               AnimatedBuilder(
-                animation: viewerController, // listens to pan/zoom changes
+                animation: viewerController,
                 builder: (_, __) {
-                  final staged = controller.stagingItem.value;
+                  final staged = place.staging.value;
                   if (staged == null) return const SizedBox.shrink();
 
-                  // Size in scene pixels based on your quote scale
-                  final scenePixels = controller.pixelSizeFor(
-                    staged.realWorldSize,
+                  final scenePixels = layout.pixelSizeFor(
+                    staged.realWorldSizeMeters,
                   );
-
-                  // Current zoom from the InteractiveViewer matrix
                   final zoom = viewerController.value.getMaxScaleOnAxis();
                   final screenPixels = scenePixels * zoom;
 
@@ -248,7 +277,10 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
                           height: screenPixels,
                           child: Opacity(
                             opacity: 0.95,
-                            child: controller.buildSvgFor(staged),
+                            child: SvgPicture.asset(
+                              staged.assetPath,
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
                       ),
@@ -264,7 +296,7 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
       // ---------- FABs ----------
       floatingActionButton: Obx(() {
         // Quoting Mode
-        if (controller.quotingMode.value) {
+        if (quote.quotingMode.value) {
           return FloatingActionButton.extended(
             icon: const Icon(Icons.straighten),
             label: const Text('Set Quote'),
@@ -273,7 +305,7 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
         }
 
         // Placement Mode: Confirm / Cancel
-        if (controller.stagingItem.value != null) {
+        if (place.staging.value != null) {
           return Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -283,7 +315,7 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
                 icon: const Icon(Icons.check),
                 label: const Text('Confirm'),
                 onPressed: () {
-                  // Put item at the scene point under the viewport center
+                  // Punto scena sotto il centro del viewport
                   final box = context.findRenderObject() as RenderBox?;
                   if (box == null) return;
                   final size = box.size;
@@ -292,9 +324,7 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
                     size.height / 2,
                   );
                   final scenePoint = _viewportToScene(centerViewport);
-                  controller.confirmPlacementAtSceneCenter(
-                    scenePoint: scenePoint,
-                  );
+                  place.confirmAtSceneCenter(scenePoint);
                 },
               ),
               const SizedBox(height: 12),
@@ -303,7 +333,7 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
                 backgroundColor: Colors.grey.shade700,
                 icon: const Icon(Icons.close),
                 label: const Text('Cancel'),
-                onPressed: controller.cancelPlacement,
+                onPressed: place.cancel,
               ),
             ],
           );
@@ -314,10 +344,7 @@ class _LayoutEditorPageState extends State<LayoutEditorPage> {
           icon: const Icon(Icons.add),
           label: const Text(MyTexts.addMachinery),
           onPressed: () {
-            controller.startAddMachinery(
-              assetPath: 'assets/crane.svg',
-              realWorldSizeMeters: 2.0,
-            );
+            place.startAdd(assetPath: 'assets/crane.svg', sizeMeters: 2.0);
           },
         );
       }),
