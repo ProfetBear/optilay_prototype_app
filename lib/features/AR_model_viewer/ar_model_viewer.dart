@@ -191,47 +191,49 @@ class _ManipulationPageState extends State<ManipulationPage> {
   // ---------- Placement & scaling ----------
 
   // Place/move using WORLD transform (stable in room space).
-Future<void> _placeAtWorldPoint(Matrix4 world) async {
-  final pos = vector.Vector3(
-    world.getColumn(3).x,
-    world.getColumn(3).y,
-    world.getColumn(3).z,
-  );
-
-  // If the model hasn't been placed yet...
-  if (containerNode == null) {
-    // 1. Create the GLB node first (but don't add it to the controller yet).
-    glbNode = ARKitGltfNode(
-      name: 'DES66672-REV02 MXXXXX SZOVIKER',
-      assetType: AssetType.flutterAsset,
-      url: 'assets/ValiantRev11_WithoutHull.glb',
-      position: vector.Vector3.zero(), // Position is relative to the parent container
-      eulerAngles: vector.Vector3(0, math.pi / 2, 0), // Face 90° on Y
-      scale: vector.Vector3.all(0.01), // Start with a default small scale
+  Future<void> _placeAtWorldPoint(Matrix4 world) async {
+    final pos = vector.Vector3(
+      world.getColumn(3).x,
+      world.getColumn(3).y,
+      world.getColumn(3).z,
     );
 
-    // 2. Create the parent container node and immediately give it the GLB node as a child.
-    containerNode = ARKitNode(
-      name: 'model_container',
-      position: pos, // The container is placed at the tap location
-      childNodes: [glbNode!], // <-- KEY CHANGE HERE
-    );
+    // If the model hasn't been placed yet...
+    if (containerNode == null) {
+      // 1. Create the GLB node first (but don't add it to the controller yet).
+      glbNode = ARKitGltfNode(
+        name: 'DES66672-REV02 MXXXXX SZOVIKER',
+        assetType: AssetType.flutterAsset,
+        url: 'assets/ValiantRev11_WithoutHull.glb',
+        position:
+            vector
+                .Vector3.zero(), // Position is relative to the parent container
+        eulerAngles: vector.Vector3(0, math.pi / 2, 0), // Face 90° on Y
+        scale: vector.Vector3.all(0.01), // Start with a default small scale
+      );
 
-    // 3. Add ONLY the container node to the scene. The child comes with it automatically.
-    await arkitController.add(containerNode!);
+      // 2. Create the parent container node and immediately give it the GLB node as a child.
+      containerNode = ARKitNode(
+        name: 'model_container',
+        position: pos, // The container is placed at the tap location
+      );
 
-    // 4. Now that the node is safely in the scene, run the auto-scaling.
-    _autoScaleToLargest(glbNode!, targetLargestDimensionMeters: 0.7);
+      // 3. Add ONLY the container node to the scene. The child comes with it automatically.
+      await arkitController.add(containerNode!);
 
-  } else {
-    // If the model already exists, just move the container to the new tap position.
-    containerNode!.position = pos;
+      await arkitController.add(glbNode!, parentNodeName: containerNode!.name);
+
+      // 4. Now that the node is safely in the scene, run the auto-scaling.
+      _autoScaleToLargest(glbNode!, targetLargestDimensionMeters: 0.7);
+    } else {
+      // If the model already exists, just move the container to the new tap position.
+      containerNode!.position = pos;
+    }
+
+    // Reset gesture baselines for a fresh manipulation
+    _panBasePosition = null;
+    _rotationBaseYaw = containerNode!.eulerAngles.y;
   }
-
-  // Reset gesture baselines for a fresh manipulation
-  _panBasePosition = null;
-  _rotationBaseYaw = containerNode!.eulerAngles.y;
-}
 
   // Auto-scale very large/small models to ~target size.
   void _autoScaleToLargest(
