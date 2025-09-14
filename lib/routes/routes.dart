@@ -2,7 +2,8 @@ class MyRoutes {
   //--------- LEVEL 0 ---------
   static const home = '/';
   static const layoutProjectSelector = '/layout_project_selector';
-  static const layoutEditor2D = '/layout_editor/:id';
+  static const layoutEditor2D = '/layout_editor';
+  static const layoutViewer2D = '/layout_viewer';
   static const newCanva = '/new_canva';
   static const loadCanva = '/load_canva';
 

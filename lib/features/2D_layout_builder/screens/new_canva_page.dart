@@ -25,16 +25,15 @@ class _NewCanvaPageState extends State<NewCanvaPage> {
 
     if (name.isEmpty) {
       Get.snackbar(
-        "Nome richiesto",
-        "Inserisci un nome per la nuova Canva",
+        "Nome progetto richiesto",
+        "Inserisci un nome per creare un layout",
         backgroundColor: Colors.red.shade100,
         colorText: Colors.red.shade900,
       );
       return;
     }
-    final layoutId = LayoutIdGenerator.generate(1);
     // TODO: Logica per creare la canva o salvare su Firebase
-    Get.toNamed('/layout_editor/$layoutId', arguments: {'canvaName': name});
+    Get.toNamed('/layout_viewer', arguments: {'canvaName': name});
   }
 
   @override
@@ -51,14 +50,14 @@ class _NewCanvaPageState extends State<NewCanvaPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              "Nome della Canva",
+              MyTexts.newProjectHeader,
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: MySizes.spacing),
             TextField(
               controller: _nameController,
               decoration: const InputDecoration(
-                hintText: "Es. Progetto Cucina",
+                hintText: MyTexts.newProjectHint,
                 border: OutlineInputBorder(),
               ),
             ),
@@ -68,20 +67,12 @@ class _NewCanvaPageState extends State<NewCanvaPage> {
               child: ElevatedButton.icon(
                 onPressed: _createNewCanva,
                 icon: const Icon(Icons.check),
-                label: const Text("Crea Canva"),
+                label: const Text(MyTexts.newProjectConfirm),
               ),
             ),
           ],
         ),
       ),
     );
-  }
-}
-
-class LayoutIdGenerator {
-  static String generate(int count, {int revision = 0}) {
-    final id = count.toString().padLeft(5, '0');
-    final rev = revision.toString().padLeft(2, '0');
-    return 'LAY$id.rev$rev';
   }
 }

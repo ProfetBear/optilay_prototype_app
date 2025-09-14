@@ -75,22 +75,27 @@ class MyTexts {
       "Accelera le tue opportunità con layout preliminari.";
 
   // -- Project Selector
-  static const String projectSelectorTitle = "Gestione Canva";
+  static const String projectSelectorTitle = "Layout Builder";
   static const String projectSelectorHeader = "Cosa vuoi fare?";
-  static const String projectSelectorNewCanvaTitle = "Crea una nuova Canva";
   static const String projectSelectorNewCanvaDesc =
-      "Inizia un nuovo progetto da zero con una tela vuota.";
-  static const String projectSelectorRestoreCanvaTitle =
-      "Ripristina una Canva esistente";
+      "Inizia un nuovo progetto da zero.";
+  static const String newProjectHeader = "Nome del Progetto";
+  static const String newProjectHint =
+      "Es. Nome del Cliente - Modello Macchina";
+
+  static const String newProjectConfirm = "Crea Progetto";
+
+  static const String projectSelectorRestoreCanvaTitle = "Archivio Layout";
   static const String projectSelectorRestoreCanvaDesc =
-      "Carica un progetto salvato da Firebase.";
+      "Carica un layout da revisionare.";
 
   // -- Route Titles (optional)
-  static const String newCanvaTitle = "Nuova Canva";
+  static const String newCanvaTitle = "Nuovo Layout";
   static const String loadCanvaTitle = "Ripristina Canva";
 
   // Layout Editor 2D
 
+  static const String layoutViewerTitle = "Layout Viewer";
   static const String layoutEditorTitle = "Layout Editor";
   static const String addMachinery = "Add Machinery";
 
