@@ -5,10 +5,17 @@ import 'package:optilay_prototype_app/routes/routes.dart';
 import 'package:optilay_prototype_app/utils/constants/colors.dart';
 import 'package:optilay_prototype_app/utils/constants/text_strings.dart';
 
-class MyHomePage extends StatelessWidget {
+class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
 
   final String title;
+
+  @override
+  State<MyHomePage> createState() => _MyHomePageState();
+}
+
+class _MyHomePageState extends State<MyHomePage> {
+  bool showARSubCards = false;
 
   @override
   Widget build(BuildContext context) {
@@ -48,16 +55,15 @@ class MyHomePage extends StatelessWidget {
                 Get.toNamed(MyRoutes.layoutProjectSelector);
               },
             ),
-
             const SizedBox(height: 20),
             OptionCard(
-              title: 'AR',
-              description: 'AR Test',
-              icon: Icons.design_services,
-              color: MyColors.secondary,
-              onTap: () {
-                Get.toNamed(MyRoutes.modelViewerAR);
-              },
+            title: 'AR',
+            description: 'AR Test',
+            icon: Icons.design_services,
+            color: MyColors.secondary,
+            onTap: () {
+            Get.toNamed(MyRoutes.modelSelectorAR);
+            },
             ),
           ],
         ),

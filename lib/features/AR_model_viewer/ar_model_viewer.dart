@@ -6,7 +6,8 @@ import 'package:vector_math/vector_math_64.dart' as vector;
 import 'package:collection/collection.dart';
 
 class ManipulationPage extends StatefulWidget {
-  const ManipulationPage({super.key});
+  final String assetPath;
+  const ManipulationPage({super.key, required this.assetPath});
 
   @override
   State<ManipulationPage> createState() => _ManipulationPageState();
@@ -226,7 +227,7 @@ class _ManipulationPageState extends State<ManipulationPage> {
       glbNode = ARKitGltfNode(
         name: 'DES66672-REV02 MXXXXX SZOVIKER',
         assetType: AssetType.flutterAsset,
-        url: 'assets/XBladeRev0_WithoutHull.glb',
+        url: widget.assetPath,
         position:
             vector
                 .Vector3.zero(), // Position is relative to the parent container

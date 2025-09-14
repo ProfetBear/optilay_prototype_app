@@ -8,6 +8,7 @@ class MyRoutes {
 
   static const modelSelector3D = '/model_selector';
   static const modelViewer3D = '/model_viewer';
+  static const modelSelectorAR = '/ar-model-selector';
   static const modelViewerAR = '/ar_viewer';
   //--------- SETTINGS ---------
   static const settings = '/settings';

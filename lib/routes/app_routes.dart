@@ -4,6 +4,7 @@ import 'package:optilay_prototype_app/features/2D_layout_builder/screens/new_can
 import 'package:optilay_prototype_app/features/2D_layout_builder/screens/project_selector_page.dart';
 import 'package:optilay_prototype_app/features/3D_model_viewer/3D_model_selector.dart';
 import 'package:optilay_prototype_app/features/3D_model_viewer/3D_model_viewer.dart';
+import 'package:optilay_prototype_app/features/AR_model_viewer/ar_model_selector.dart';
 import 'package:optilay_prototype_app/features/AR_model_viewer/ar_model_viewer.dart';
 import 'package:optilay_prototype_app/home.dart';
 import 'package:optilay_prototype_app/utils/constants/text_strings.dart';
@@ -54,20 +55,20 @@ class AppRoutes {
       transition: Transition.fadeIn,
       transitionDuration: Duration(milliseconds: 50),
     ),
-
-    // routes.dart
     GetPage(
-      name: MyRoutes.modelViewer3D,
-      page: () {
-        final assetPath = Get.parameters['assetPath'];
-        return ModelViewerPage(
-          filename: assetPath ?? 'assets/default_model.glb',
-        );
-      },
-    ),
-    // routes.dart
-    //OLD GetPage(name: MyRoutes.modelViewerAR, page: () => LoadGltfOrGlbFilePage()),
-    GetPage(name: MyRoutes.modelViewerAR, page: () => ManipulationPage()),
+    name: MyRoutes.modelSelectorAR,
+    page: () => const ARModelSelectorPage(),
+    transition: Transition.fadeIn,
+    transitionDuration: Duration(milliseconds: 50),
+  ),
+    GetPage(
+  name: MyRoutes.modelViewerAR,
+  page: () => ManipulationPage(
+    assetPath: Get.arguments?['assetPath'] ?? '',
+  ),
+  transition: Transition.fadeIn,
+  transitionDuration: Duration(milliseconds: 50),
+),
     // -- TODO Authentication
     /*
     GetPage(
