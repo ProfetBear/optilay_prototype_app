@@ -16,7 +16,7 @@ class ManipulationPage extends StatefulWidget {
 class _ManipulationPageState extends State<ManipulationPage> {
   late ARKitController arkitController;
 
-  bool _withoutHull = true;
+  bool _withoutHull = false;
   // Helper to get the "without hull" asset path
   String getWithoutHullAsset(String assetPath) {
     final extIndex = assetPath.lastIndexOf('.glb');
@@ -24,15 +24,18 @@ class _ManipulationPageState extends State<ManipulationPage> {
     return assetPath.replaceRange(extIndex, extIndex, '_WithoutHull');
   }
 
-  // Remove previous GLB and add new one
-  Future<void> replaceWithWithoutHull() async {
+  // Remove previous GLB and add new one (with or without hull)
+  Future<void> replaceModel({required bool withoutHull}) async {
     if (containerNode == null || glbNode == null) return;
 
     // Remove previous GLB node
     await arkitController.remove(glbNode!.name);
 
-    // Create new GLB node with modified asset path
-    final newAssetPath = getWithoutHullAsset(widget.assetPath);
+    // Choose asset path based on switch state
+    final newAssetPath = withoutHull
+        ? getWithoutHullAsset(widget.assetPath)
+        : widget.assetPath;
+
     glbNode = ARKitGltfNode(
       name: newAssetPath,
       assetType: AssetType.flutterAsset,
@@ -43,10 +46,14 @@ class _ManipulationPageState extends State<ManipulationPage> {
 
     await arkitController.add(glbNode!, parentNodeName: containerNode!.name);
 
-    // Optionally auto-scale
-    _autoScaleToLargest(glbNode!, targetLargestDimensionMeters: 0.7);
-    _withoutHull = !_withoutHull;
-    setState(() {});
+    Future.delayed( Duration(milliseconds: 100), () {
+      if (glbNode != null) {
+        _autoScaleToLargest(glbNode!, targetLargestDimensionMeters: 0.7);
+      }
+    });
+    setState(() {
+      _withoutHull = withoutHull;
+    });
   }
 
   // World-anchored container; GLB is a child of this
@@ -81,7 +88,7 @@ class _ManipulationPageState extends State<ManipulationPage> {
               Switch(
                 value: _withoutHull,
                 onChanged: (bool value) async {
-                  await replaceWithWithoutHull();
+                  await replaceModel(withoutHull: value);
                 },
               ),
             ],
