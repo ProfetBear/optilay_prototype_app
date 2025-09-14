@@ -82,17 +82,26 @@ class _ModelViewerPageState extends State<ModelViewerPage> {
   }
 
   void _showWithoutHull() async {
-    final extIndex = _currentAsset.lastIndexOf('.glb');
-    if (extIndex == -1) return;
-    final newAsset = _currentAsset.replaceRange(extIndex, extIndex, '_WithoutHull');
-    setState(() {
-      _currentAsset = newAsset;
-      _glbUrl = null;
-      _server?.close(force: true);
-      _server = null;
-    });
-    await _prepareAndServe();
+  final extIndex = _currentAsset.lastIndexOf('.glb');
+  if (extIndex == -1) return;
+
+  String newAsset;
+  if (_currentAsset.contains('_WithoutHull')) {
+    // If currently without hull, switch to standard
+    newAsset = _currentAsset.replaceAll('_WithoutHull', '');
+  } else {
+    // If currently standard, switch to without hull
+    newAsset = _currentAsset.replaceRange(extIndex, extIndex, '_WithoutHull');
   }
+
+  setState(() {
+    _currentAsset = newAsset;
+    _glbUrl = null;
+    _server?.close(force: true);
+    _server = null;
+  });
+  await _prepareAndServe();
+}
 
   @override
   Widget build(BuildContext context) {
