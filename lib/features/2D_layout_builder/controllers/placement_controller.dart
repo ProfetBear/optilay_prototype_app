@@ -25,7 +25,7 @@ class PlacementController extends GetxController {
     if (staged == null) return;
 
     final px = layout.pixelSizeFor(staged.realWorldSizeMeters);
-    final topLeft = scenePoint - Offset(px / 2, px / 2);
+    final topLeft = scenePoint - Offset(px / 2, px / 1.6);
 
     layout.items.add(
       staged.copyWith(
