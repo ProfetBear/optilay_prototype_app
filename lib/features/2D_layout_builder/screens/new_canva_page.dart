@@ -40,7 +40,10 @@ class _NewCanvaPageState extends State<NewCanvaPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(MyTexts.newCanvaTitle),
+        title: const Text(
+          MyTexts.newCanvaTitle,
+          style: TextStyle(color: Colors.white),
+        ),
         centerTitle: true,
         backgroundColor: MyColors.primary,
       ),
@@ -65,6 +68,16 @@ class _NewCanvaPageState extends State<NewCanvaPage> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: MyColors.primary,
+                  padding: const EdgeInsets.symmetric(
+                    vertical: MySizes.padding,
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: MySizes.fontSizeMd,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 onPressed: _createNewCanva,
                 icon: const Icon(Icons.check),
                 label: const Text(MyTexts.newProjectConfirm),

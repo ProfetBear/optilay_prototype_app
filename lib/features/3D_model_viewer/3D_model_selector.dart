@@ -11,9 +11,12 @@ class ModelSelectorPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Select 3D Model'),
+        title: const Text(
+          'Select 3D Model',
+          style: TextStyle(color: Colors.white),
+        ),
         centerTitle: true,
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        backgroundColor: MyColors.primary,
       ),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
