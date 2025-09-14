@@ -56,6 +56,14 @@ class AppRoutes {
       transitionDuration: Duration(milliseconds: 50),
     ),
     GetPage(
+  name: MyRoutes.modelViewer3D,
+  page: () => ModelViewerPage(
+    filename: Get.arguments?['assetPath'] ?? '',
+  ),
+  transition: Transition.fadeIn,
+  transitionDuration: Duration(milliseconds: 50),
+),
+    GetPage(
     name: MyRoutes.modelSelectorAR,
     page: () => const ARModelSelectorPage(),
     transition: Transition.fadeIn,

@@ -3,7 +3,6 @@ import 'package:get/get.dart';
 import 'package:optilay_prototype_app/common/widgets/option_card.dart';
 import 'package:optilay_prototype_app/routes/routes.dart';
 import 'package:optilay_prototype_app/utils/constants/colors.dart';
-import 'package:optilay_prototype_app/utils/constants/text_strings.dart';
 
 class ModelSelectorPage extends StatelessWidget {
   const ModelSelectorPage({super.key});
@@ -12,7 +11,7 @@ class ModelSelectorPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(MyTexts.projectSelectorTitle),
+        title: const Text('Select 3D Model'),
         centerTitle: true,
         backgroundColor: Theme.of(context).colorScheme.primary,
       ),
@@ -21,47 +20,28 @@ class ModelSelectorPage extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text(
-              MyTexts.projectSelectorHeader,
-              style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
             OptionCard(
-              title: MyTexts.standardModel,
-              description: MyTexts.projectSelectorNewCanvaDesc,
-              icon: Icons.add_circle_outline,
+              title: 'Valiant',
+              description: 'Show Valiant',
+              icon: Icons.precision_manufacturing,
+              color: MyColors.blue,
+              onTap: () {
+                Get.toNamed(
+                  MyRoutes.modelViewer3D,
+                  arguments: {'assetPath': 'assets/ValiantRev11.glb'},
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+            OptionCard(
+              title: 'XBlade',
+              description: 'Show XBlade',
+              icon: Icons.precision_manufacturing,
               color: MyColors.green,
               onTap: () {
                 Get.toNamed(
                   MyRoutes.modelViewer3D,
-                  parameters: {'assetPath': 'assets/default_model.glb'},
-                );
-              },
-            ),
-            const SizedBox(height: 20),
-            OptionCard(
-              title: MyTexts.saw,
-              description: MyTexts.projectSelectorRestoreCanvaDesc,
-              icon: Icons.cloud_download_outlined,
-              color: MyColors.blue,
-              onTap: () {
-                Get.toNamed(
-                  MyRoutes.modelViewer3D,
-                  parameters: {'assetPath': 'assets/saw.glb'},
-                );
-              },
-            ),
-            const SizedBox(height: 20),
-            OptionCard(
-              title: MyTexts.drill,
-              description: MyTexts.projectSelectorRestoreCanvaDesc,
-              icon: Icons.pin,
-              color: MyColors.blue,
-              onTap: () {
-                Get.toNamed(
-                  MyRoutes.modelViewer3D,
-                  parameters: {'assetPath': 'assets/valiant_rev00.glb'},
+                  arguments: {'assetPath': 'assets/XBladeRev1.glb'},
                 );
               },
             ),
