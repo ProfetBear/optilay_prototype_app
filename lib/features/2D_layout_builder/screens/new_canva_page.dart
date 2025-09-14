@@ -40,7 +40,10 @@ class _NewCanvaPageState extends State<NewCanvaPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(MyTexts.newCanvaTitle),
+        title: const Text(
+          MyTexts.newCanvaTitle,
+          style: TextStyle(color: Colors.white),
+        ),
         centerTitle: true,
         backgroundColor: MyColors.primary,
       ),

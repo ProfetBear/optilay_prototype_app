@@ -21,9 +21,12 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(MyTexts.homeAppbarTitle),
+        title: const Text(
+          MyTexts.homeAppbarTitle,
+          style: TextStyle(color: Colors.white),
+        ),
         centerTitle: true,
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        backgroundColor: MyColors.primary,
       ),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -47,23 +50,23 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
             const SizedBox(height: 20),
             OptionCard(
-              title: MyTexts.homeCanvaManagerButtonTitle,
-              description: MyTexts.homeCanvaManagerButtonDesc,
+              title: MyTexts.homeArViewerButtonTitle,
+              description: MyTexts.homeArViewerButtonDesc,
               icon: Icons.design_services,
-              color: MyColors.secondary,
+              color: MyColors.primary,
               onTap: () {
-                Get.toNamed(MyRoutes.layoutProjectSelector);
+                Get.toNamed(MyRoutes.modelSelectorAR);
               },
             ),
             const SizedBox(height: 20),
             OptionCard(
-            title: 'AR',
-            description: 'AR Test',
-            icon: Icons.design_services,
-            color: MyColors.secondary,
-            onTap: () {
-            Get.toNamed(MyRoutes.modelSelectorAR);
-            },
+              title: MyTexts.homeCanvaManagerButtonTitle,
+              description: MyTexts.homeCanvaManagerButtonDesc,
+              icon: Icons.design_services,
+              color: MyColors.primary,
+              onTap: () {
+                Get.toNamed(MyRoutes.layoutProjectSelector);
+              },
             ),
           ],
         ),

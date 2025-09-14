@@ -12,9 +12,12 @@ class ProjectSelectorPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(MyTexts.projectSelectorTitle),
+        title: const Text(
+          MyTexts.projectSelectorTitle,
+          style: TextStyle(color: Colors.white),
+        ),
         centerTitle: true,
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        backgroundColor: MyColors.primary,
       ),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -45,6 +48,7 @@ class ProjectSelectorPage extends StatelessWidget {
               onTap: () {
                 Get.toNamed(MyRoutes.loadCanva);
               },
+              enabled: false,
             ),
           ],
         ),

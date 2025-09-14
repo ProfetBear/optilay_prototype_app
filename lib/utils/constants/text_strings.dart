@@ -67,9 +67,13 @@ class MyTexts {
   static const String homeAppbarTitle = "OptiLay Prototype";
   static const String homeWelcome = "Benvenuto in OptiLay";
   static const String homeDescription = "Questa è un'applicazione demo";
-  static const String home3DViewerButtonTitle = "Catalogo 3D AR";
+  static const String home3DViewerButtonTitle = "Catalogo 3D";
   static const String home3DViewerButtonDesc =
-      "Visualizza parco macchine in 3D e realtà aumentata.";
+      "Visualizza parco macchine in 3D.";
+
+  static const String homeArViewerButtonTitle = "Catalogo AR";
+  static const String homeArViewerButtonDesc =
+      "Visualizza parco macchine in realtà aumentata.";
   static const String homeCanvaManagerButtonTitle = "Layout Builder";
   static const String homeCanvaManagerButtonDesc =
       "Accelera le tue opportunità con layout preliminari.";

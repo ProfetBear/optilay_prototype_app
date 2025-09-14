@@ -5,28 +5,33 @@ class OptionCard extends StatelessWidget {
   final String title;
   final String description;
   final IconData icon;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final Color color;
+  final bool enabled; // <-- NEW
 
   const OptionCard({
     super.key,
     required this.title,
     required this.description,
     required this.icon,
-    required this.onTap,
     required this.color,
+    this.onTap,
+    this.enabled = true, // default selectable
   });
 
   @override
   Widget build(BuildContext context) {
+    final Color effectiveColor =
+        enabled ? color : Colors.grey; // gray out when disabled
+
     return InkWell(
-      onTap: onTap,
-      splashColor: color.withOpacity(0.2),
+      onTap: enabled ? onTap : null, // disable tap
+      splashColor: enabled ? color.withOpacity(0.2) : Colors.transparent,
       borderRadius: BorderRadius.circular(MySizes.borderRadiusMd),
       child: Container(
         padding: const EdgeInsets.all(MySizes.padding),
         decoration: BoxDecoration(
-          border: Border.all(color: color.withOpacity(0.4)),
+          border: Border.all(color: effectiveColor.withOpacity(0.4)),
           borderRadius: BorderRadius.circular(MySizes.padding),
           color: Theme.of(context).cardColor,
           boxShadow: const [
@@ -40,8 +45,8 @@ class OptionCard extends StatelessWidget {
         child: Row(
           children: [
             CircleAvatar(
-              backgroundColor: color.withOpacity(0.1),
-              child: Icon(icon, color: color, size: MySizes.iconLg),
+              backgroundColor: effectiveColor.withOpacity(0.1),
+              child: Icon(icon, color: effectiveColor, size: MySizes.iconLg),
               radius: 28,
             ),
             const SizedBox(width: MySizes.spacing),
@@ -54,7 +59,7 @@ class OptionCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: MySizes.fontSizeLg,
                       fontWeight: FontWeight.w600,
-                      color: color,
+                      color: effectiveColor,
                     ),
                   ),
                   const SizedBox(height: MySizes.md),
@@ -62,7 +67,10 @@ class OptionCard extends StatelessWidget {
                     description,
                     style: TextStyle(
                       fontSize: MySizes.fontSizeMd,
-                      color: Theme.of(context).textTheme.bodySmall?.color,
+                      color:
+                          enabled
+                              ? Theme.of(context).textTheme.bodySmall?.color
+                              : Colors.grey,
                     ),
                   ),
                 ],
