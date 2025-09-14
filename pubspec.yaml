@@ -85,16 +85,10 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/valiant_rev00.glb
-    - assets/saw.glb
-    - assets/saw.usdz
-    - assets/default_model.glb
-    - assets/default_model.usdz
-    - assets/crane.svg
     - assets/ValiantRev11.glb
     - assets/ValiantRev11_WithoutHull.glb
-    - assets/XBlade_Rev0.glb
-    - assets/XBladeRev0_WithoutHull.glb
+    - assets/XBladeRev1.glb
+    - assets/XBladeRev1_WithoutHull.glb
     
   # To add assets to your application, add an assets section, like this:
   # assets:

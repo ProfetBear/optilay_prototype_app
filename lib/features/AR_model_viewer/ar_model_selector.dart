@@ -11,7 +11,7 @@ final List<Map<String, String>> arModels = [
   },
   {
     'name': 'XBlade',
-    'asset': 'assets/XBlade_Rev0.glb',
+    'asset': 'assets/XBladeRev1.glb',
   },
   {
     'name': 'Valiant Without Hull',
@@ -19,7 +19,7 @@ final List<Map<String, String>> arModels = [
   },
   {
     'name': 'XBlade Without Hull',
-    'asset': 'assets/XBladeRev0_WithoutHull.glb',
+    'asset': 'assets/XBladeRev1_WithoutHull.glb',
   },
 ];
 
