@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/controllers/layout_controller.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/controllers/quote_controller.dart';
+import 'package:optilay_prototype_app/utils/constants/colors.dart';
 
 class MyPdfDrawer extends StatelessWidget {
   final GlobalKey canvasKey;
@@ -18,7 +19,7 @@ class MyPdfDrawer extends StatelessWidget {
           padding: EdgeInsets.zero,
           children: [
             const DrawerHeader(
-              decoration: BoxDecoration(color: Colors.blue),
+              decoration: BoxDecoration(color: MyColors.primary),
               child: Text(
                 'PDF Tools',
                 style: TextStyle(fontSize: 24, color: Colors.white),
