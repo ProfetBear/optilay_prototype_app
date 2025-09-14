@@ -85,6 +85,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/crane.svg
     - assets/ValiantRev11.glb
     - assets/ValiantRev11_WithoutHull.glb
     - assets/XBladeRev1.glb
