@@ -21,6 +21,7 @@ class _ModelViewerPageState extends State<ModelViewerPage> {
   HttpServer? _server;
   bool _starting = false;
   String _currentAsset = '';
+  bool _withoutHull = false;
 
   @override
   void initState() {
@@ -42,9 +43,15 @@ class _ModelViewerPageState extends State<ModelViewerPage> {
 
     try {
       final docs = await getApplicationDocumentsDirectory();
-      final glbData = await rootBundle.load(_currentAsset);
+      final assetToLoad = _withoutHull
+          ? _currentAsset.replaceRange(
+              _currentAsset.lastIndexOf('.glb'),
+              _currentAsset.lastIndexOf('.glb'),
+              '_WithoutHull')
+          : _currentAsset;
+      final glbData = await rootBundle.load(assetToLoad);
       final glbBytes = glbData.buffer.asUint8List();
-      final glbName = _currentAsset.split('/').last;
+      final glbName = assetToLoad.split('/').last;
       final glbPath = '${docs.path}/$glbName';
       final glbFile = await compute(_writeFileIsolate, {
         'bytes': glbBytes,
@@ -81,27 +88,15 @@ class _ModelViewerPageState extends State<ModelViewerPage> {
     }
   }
 
-  void _showWithoutHull() async {
-  final extIndex = _currentAsset.lastIndexOf('.glb');
-  if (extIndex == -1) return;
-
-  String newAsset;
-  if (_currentAsset.contains('_WithoutHull')) {
-    // If currently without hull, switch to standard
-    newAsset = _currentAsset.replaceAll('_WithoutHull', '');
-  } else {
-    // If currently standard, switch to without hull
-    newAsset = _currentAsset.replaceRange(extIndex, extIndex, '_WithoutHull');
+  void _toggleHull(bool value) async {
+    setState(() {
+      _withoutHull = value;
+      _glbUrl = null;
+      _server?.close(force: true);
+      _server = null;
+    });
+    await _prepareAndServe();
   }
-
-  setState(() {
-    _currentAsset = newAsset;
-    _glbUrl = null;
-    _server?.close(force: true);
-    _server = null;
-  });
-  await _prepareAndServe();
-}
 
   @override
   Widget build(BuildContext context) {
@@ -109,32 +104,29 @@ class _ModelViewerPageState extends State<ModelViewerPage> {
     final srcForPlatform = (_glbUrl ?? '');
 
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(
+        actions: [
+          Row(
+            children: [
+              Text('Hull', style: TextStyle(color: Colors.white)),
+              Switch(
+                value: _withoutHull,
+                onChanged: _toggleHull,
+              ),
+            ],
+          ),
+        ],
+      ),
       body: !ready
           ? const Center(child: CircularProgressIndicator())
-          : Stack(
-              children: [
-                Positioned.fill(
-                  child: ModelViewer(
-                    src: srcForPlatform,
-                    alt: '3D Model',
-                    ar: true,
-                    arModes: const ['quick-look', 'webxr', 'scene-viewer'],
-                    autoRotate: true,
-                    cameraControls: true,
-                    backgroundColor: Colors.white,
-                  ),
-                ),
-                Positioned(
-                  bottom: 20,
-                  left: 20,
-                  child: ElevatedButton.icon(
-                    onPressed: _showWithoutHull,
-                    icon: const Icon(Icons.layers_clear),
-                    label: const Text('Show Without Hull'),
-                  ),
-                ),
-              ],
+          : ModelViewer(
+              src: srcForPlatform,
+              alt: '3D Model',
+              ar: true,
+              arModes: const ['quick-look', 'webxr', 'scene-viewer'],
+              autoRotate: true,
+              cameraControls: true,
+              backgroundColor: Colors.white,
             ),
     );
   }
