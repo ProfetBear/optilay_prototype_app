@@ -16,6 +16,7 @@ class ManipulationPage extends StatefulWidget {
 class _ManipulationPageState extends State<ManipulationPage> {
   late ARKitController arkitController;
 
+  bool _withoutHull = true;
   // Helper to get the "without hull" asset path
   String getWithoutHullAsset(String assetPath) {
     final extIndex = assetPath.lastIndexOf('.glb');
@@ -44,6 +45,8 @@ class _ManipulationPageState extends State<ManipulationPage> {
 
     // Optionally auto-scale
     _autoScaleToLargest(glbNode!, targetLargestDimensionMeters: 0.7);
+    _withoutHull = !_withoutHull;
+    setState(() {});
   }
 
   // World-anchored container; GLB is a child of this
@@ -70,7 +73,21 @@ class _ManipulationPageState extends State<ManipulationPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(),
+      appBar: AppBar(
+        actions: [
+          Row(
+            children: [
+              Text('Hull', style: TextStyle(color: Colors.white)),
+              Switch(
+                value: _withoutHull,
+                onChanged: (bool value) async {
+                  await replaceWithWithoutHull();
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
       body: Stack(
         children: [
           ARKitSceneView(
@@ -105,16 +122,6 @@ class _ManipulationPageState extends State<ManipulationPage> {
                         text: 'Move your device to detect a horizontal surface',
                         icon: Icons.phone_iphone,
                       ),
-            ),
-          ),
-          Positioned(
-            top: 200,
-            right: 24,
-            child: ElevatedButton(
-              onPressed: () async {
-                await replaceWithWithoutHull();
-              },
-              child: const Text('Show Without Hull'),
             ),
           ),
         ],
