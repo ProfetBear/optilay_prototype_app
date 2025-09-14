@@ -304,8 +304,13 @@ class _ManipulationPageState extends State<ManipulationPage> {
       });
       _planes.clear();
 
+      Future.delayed( Duration(milliseconds: 100), () {
+        if (glbNode != null) {
+          _autoScaleToLargest(glbNode!, targetLargestDimensionMeters: 0.7);
+        }
+      });
       // 4. Now that the node is safely in the scene, run the auto-scaling.
-      _autoScaleToLargest(glbNode!, targetLargestDimensionMeters: 0.7);
+      //_autoScaleToLargest(glbNode!, targetLargestDimensionMeters: 0.7);
     } else {
       // If the model already exists, just move the container to the new tap position.
       containerNode!.position = pos;
