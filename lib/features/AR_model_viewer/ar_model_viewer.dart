@@ -69,7 +69,8 @@ class _ManipulationPageState extends State<ManipulationPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Manipulation Sample')),
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(),
       body: Stack(
         children: [
           ARKitSceneView(
@@ -151,27 +152,26 @@ class _ManipulationPageState extends State<ManipulationPage> {
     // --- Gestures ---
     // Pinch -> scale GLB
     arkitController.onNodePinch = (events) {
-  if (glbNode == null || events.isEmpty) return;
+      if (glbNode == null || events.isEmpty) return;
 
-  final pinch = events.first;
+      final pinch = events.first;
 
-  // If it's a new gesture, store the current node scale as the base
-  if (_baseScale == null || pinch.scale == 1.0) {
-    _baseScale = glbNode!.scale.x; // assuming uniform scaling
-  }
+      // If it's a new gesture, store the current node scale as the base
+      if (_baseScale == null || pinch.scale == 1.0) {
+        _baseScale = glbNode!.scale.x; // assuming uniform scaling
+      }
 
-  // Apply relative scaling: base * pinch delta
-  final newScale = (_baseScale! * pinch.scale);
+      // Apply relative scaling: base * pinch delta
+      final newScale = (_baseScale! * pinch.scale);
 
-  glbNode!.scale = vector.Vector3.all(newScale);
-};
+      glbNode!.scale = vector.Vector3.all(newScale);
+    };
 
     // Two-finger twist -> yaw container
     arkitController.onNodeRotation = _onRotationHandler;
 
     // One-finger drag -> translate container in X/Z
     arkitController.onNodePan = (events) {
-      
       /* Translation with one finger (disabled for now)
       if (containerNode == null || events.isEmpty) return;
       final t = events.first.translation; // Vector2 delta since gesture start
@@ -189,19 +189,18 @@ class _ManipulationPageState extends State<ManipulationPage> {
 
       // TEST ROTATION ONE FINGER
       if (containerNode == null || events.isEmpty) return;
-        final t = events.first.translation; 
-        final delta = t.x/t.length * math.pi *2;
+      final t = events.first.translation;
+      final delta = t.x / t.length * math.pi * 2;
       // Initialize base rotation at the start of gesture
       if (_rotationBase == null || delta.abs() < 1e-6) {
         _rotationBase = glbNode!.eulerAngles.clone();
-
       }
 
       // Incremental rotation: add delta to base rotation
       final newRotation = vector.Vector3(
-      _rotationBase!.x+ delta,
-      _rotationBase!.y , // rotate around Y axis
-      _rotationBase!.z ,
+        _rotationBase!.x + delta,
+        _rotationBase!.y, // rotate around Y axis
+        _rotationBase!.z,
       );
       containerNode!.eulerAngles = newRotation;
     };
@@ -287,7 +286,7 @@ class _ManipulationPageState extends State<ManipulationPage> {
 
       // Nascondi i piani
       _planes.forEach((key, viz) {
-      arkitController.remove(viz.node.name);
+        arkitController.remove(viz.node.name);
       });
       _planes.clear();
 
@@ -332,31 +331,31 @@ class _ManipulationPageState extends State<ManipulationPage> {
           // ignore if bounding box isn't ready yet
         });
   }
+
   // Incremental rotation handler
   void _onRotationHandler(List<ARKitNodeRotationResult> rotationEvents) {
-  if (glbNode == null || rotationEvents.isEmpty) return;
+    if (glbNode == null || rotationEvents.isEmpty) return;
 
-  final rotationResult = rotationEvents.firstWhereOrNull(
-    (e) => e.nodeName == glbNode!.name,
-  );
-  if (rotationResult == null) return;
+    final rotationResult = rotationEvents.firstWhereOrNull(
+      (e) => e.nodeName == glbNode!.name,
+    );
+    if (rotationResult == null) return;
 
-  final delta = rotationResult.rotation; // radians since gesture start
+    final delta = rotationResult.rotation; // radians since gesture start
 
-  // Initialize base rotation at the start of gesture
-  if (_rotationBase == null || delta.abs() < 1e-6) {
-    _rotationBase = glbNode!.eulerAngles.clone();
+    // Initialize base rotation at the start of gesture
+    if (_rotationBase == null || delta.abs() < 1e-6) {
+      _rotationBase = glbNode!.eulerAngles.clone();
+    }
+
+    // Incremental rotation: add delta to base rotation
+    final newRotation = vector.Vector3(
+      _rotationBase!.x,
+      _rotationBase!.y + delta, // rotate around Y axis
+      _rotationBase!.z,
+    );
+    containerNode!.eulerAngles = newRotation;
   }
-
-  // Incremental rotation: add delta to base rotation
-  final newRotation = vector.Vector3(
-    _rotationBase!.x,
-    _rotationBase!.y + delta, // rotate around Y axis
-    _rotationBase!.z,
-  );
-  containerNode!.eulerAngles = newRotation;
-}
-
 }
 
 // Small helper for plane viz bookkeeping
