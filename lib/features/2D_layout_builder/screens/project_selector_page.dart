@@ -34,7 +34,7 @@ class ProjectSelectorPage extends StatelessWidget {
               title: MyTexts.newCanvaTitle,
               description: MyTexts.projectSelectorNewCanvaDesc,
               icon: Icons.add_circle_outline,
-              color: MyColors.green,
+              color: MyColors.primary,
               onTap: () {
                 Get.toNamed(MyRoutes.newCanva);
               },

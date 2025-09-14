@@ -27,7 +27,7 @@ class ModelSelectorPage extends StatelessWidget {
               title: 'Valiant',
               description: 'Show Valiant',
               icon: Icons.precision_manufacturing,
-              color: MyColors.blue,
+              color: MyColors.primary,
               onTap: () {
                 Get.toNamed(
                   MyRoutes.modelViewer3D,
@@ -40,7 +40,7 @@ class ModelSelectorPage extends StatelessWidget {
               title: 'XBlade',
               description: 'Show XBlade',
               icon: Icons.precision_manufacturing,
-              color: MyColors.green,
+              color: MyColors.primary,
               onTap: () {
                 Get.toNamed(
                   MyRoutes.modelViewer3D,

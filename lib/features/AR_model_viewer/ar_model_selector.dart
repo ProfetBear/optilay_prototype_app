@@ -7,11 +7,6 @@ import 'package:optilay_prototype_app/utils/constants/colors.dart';
 final List<Map<String, String>> arModels = [
   {'name': 'Valiant', 'asset': 'assets/ValiantRev11.glb'},
   {'name': 'XBlade', 'asset': 'assets/XBladeRev1.glb'},
-  {
-    'name': 'Valiant Without Hull',
-    'asset': 'assets/ValiantRev11_WithoutHull.glb',
-  },
-  {'name': 'XBlade Without Hull', 'asset': 'assets/XBladeRev1_WithoutHull.glb'},
 ];
 
 class ARModelSelectorPage extends StatelessWidget {

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:model_viewer_plus/model_viewer_plus.dart';
+import 'package:optilay_prototype_app/utils/constants/colors.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
@@ -43,12 +44,14 @@ class _ModelViewerPageState extends State<ModelViewerPage> {
 
     try {
       final docs = await getApplicationDocumentsDirectory();
-      final assetToLoad = _withoutHull
-          ? _currentAsset.replaceRange(
-              _currentAsset.lastIndexOf('.glb'),
-              _currentAsset.lastIndexOf('.glb'),
-              '_WithoutHull')
-          : _currentAsset;
+      final assetToLoad =
+          _withoutHull
+              ? _currentAsset.replaceRange(
+                _currentAsset.lastIndexOf('.glb'),
+                _currentAsset.lastIndexOf('.glb'),
+                '_WithoutHull',
+              )
+              : _currentAsset;
       final glbData = await rootBundle.load(assetToLoad);
       final glbBytes = glbData.buffer.asUint8List();
       final glbName = assetToLoad.split('/').last;
@@ -71,11 +74,7 @@ class _ModelViewerPageState extends State<ModelViewerPage> {
         );
       });
 
-      _server = await shelf_io.serve(
-        handler,
-        InternetAddress.loopbackIPv4,
-        0,
-      );
+      _server = await shelf_io.serve(handler, InternetAddress.loopbackIPv4, 0);
 
       final base = 'http://${_server!.address.host}:${_server!.port}';
 
@@ -108,26 +107,28 @@ class _ModelViewerPageState extends State<ModelViewerPage> {
         actions: [
           Row(
             children: [
-              Text('Hull', style: TextStyle(color: Colors.white)),
+              Text('Hull', style: TextStyle(color: MyColors.primary)),
               Switch(
                 value: _withoutHull,
                 onChanged: _toggleHull,
+                activeThumbColor: MyColors.primary,
               ),
             ],
           ),
         ],
       ),
-      body: !ready
-          ? const Center(child: CircularProgressIndicator())
-          : ModelViewer(
-              src: srcForPlatform,
-              alt: '3D Model',
-              ar: true,
-              arModes: const ['quick-look', 'webxr', 'scene-viewer'],
-              autoRotate: true,
-              cameraControls: true,
-              backgroundColor: Colors.white,
-            ),
+      body:
+          !ready
+              ? const Center(child: CircularProgressIndicator())
+              : ModelViewer(
+                src: srcForPlatform,
+                alt: '3D Model',
+                ar: true,
+                arModes: const ['quick-look', 'webxr', 'scene-viewer'],
+                autoRotate: true,
+                cameraControls: true,
+                backgroundColor: Colors.white,
+              ),
     );
   }
 }
