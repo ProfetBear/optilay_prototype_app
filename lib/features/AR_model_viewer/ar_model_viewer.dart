@@ -16,6 +16,36 @@ class ManipulationPage extends StatefulWidget {
 class _ManipulationPageState extends State<ManipulationPage> {
   late ARKitController arkitController;
 
+  // Helper to get the "without hull" asset path
+  String getWithoutHullAsset(String assetPath) {
+    final extIndex = assetPath.lastIndexOf('.glb');
+    if (extIndex == -1) return assetPath;
+    return assetPath.replaceRange(extIndex, extIndex, '_WithoutHull');
+  }
+
+  // Remove previous GLB and add new one
+  Future<void> replaceWithWithoutHull() async {
+    if (containerNode == null || glbNode == null) return;
+
+    // Remove previous GLB node
+    await arkitController.remove(glbNode!.name);
+
+    // Create new GLB node with modified asset path
+    final newAssetPath = getWithoutHullAsset(widget.assetPath);
+    glbNode = ARKitGltfNode(
+      name: newAssetPath,
+      assetType: AssetType.flutterAsset,
+      url: newAssetPath,
+      position: vector.Vector3.zero(),
+      scale: vector.Vector3.all(0.01),
+    );
+
+    await arkitController.add(glbNode!, parentNodeName: containerNode!.name);
+
+    // Optionally auto-scale
+    _autoScaleToLargest(glbNode!, targetLargestDimensionMeters: 0.7);
+  }
+
   // World-anchored container; GLB is a child of this
   ARKitNode? containerNode;
   ARKitGltfNode? glbNode;
@@ -74,6 +104,16 @@ class _ManipulationPageState extends State<ManipulationPage> {
                         text: 'Move your device to detect a horizontal surface',
                         icon: Icons.phone_iphone,
                       ),
+            ),
+          ),
+          Positioned(
+            top: 32,
+            right: 24,
+            child: ElevatedButton(
+              onPressed: () async {
+                await replaceWithWithoutHull();
+              },
+              child: const Text('Show Without Hull'),
             ),
           ),
         ],
