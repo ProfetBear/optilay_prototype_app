@@ -18,9 +18,7 @@ migrate_working_dir/
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
+# VSCode (uncomment if you don’t want to share launch configs)
 #.vscode/
 
 # Flutter/Dart/Pub related
@@ -39,11 +37,22 @@ app.*.symbols
 # Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
+# Android build artifacts
 /android/app/debug
 /android/app/profile
 /android/app/release
 
-/assets/
+# iOS specific (keep Podfile & Podfile.lock)
+/ios/Flutter/Flutter.framework
+/ios/Flutter/Flutter.podspec
+/ios/Flutter/Generated.xcconfig
+/ios/Flutter/ephemeral/
+/ios/.symlinks/
+/ios/Pods/
+/ios/Runner.xcworkspace/
+/ios/DerivedData/
 
+# Assets
+# Keep the assets folder itself in Git
+# Ignore only temporary/binary files if needed
 *.glb
