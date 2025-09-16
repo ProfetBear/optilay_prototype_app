@@ -48,6 +48,19 @@ class ModelSelectorPage extends StatelessWidget {
                 );
               },
             ),
+            const SizedBox(height: 20),
+            OptionCard(
+              title: 'Gemini',
+              description: 'Show Gemini',
+              icon: Icons.precision_manufacturing,
+              color: MyColors.primary,
+              onTap: () {
+                Get.toNamed(
+                  MyRoutes.modelViewer3D,
+                  arguments: {'assetPath': 'assets/GeiminiRev0.glb'},
+                );
+              },
+            ),
           ],
         ),
       ),
