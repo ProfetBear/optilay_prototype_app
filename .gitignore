@@ -51,6 +51,7 @@ app.*.map.json
 /ios/Pods/
 /ios/Runner.xcworkspace/
 /ios/DerivedData/
+ios/build/
 
 # Assets
 # Keep the assets folder itself in Git
