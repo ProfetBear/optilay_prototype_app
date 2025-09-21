@@ -90,7 +90,8 @@ flutter:
     - assets/ValiantRev11_WithoutHull.glb
     - assets/XBladeRev1.glb
     - assets/XBladeRev1_WithoutHull.glb
-    - assets/GeiminiRev0.glb
+    - assets/GeminiRev0.glb
+    - assets/GeminiRev0_WithoutHull.glb
     
   # To add assets to your application, add an assets section, like this:
   # assets:

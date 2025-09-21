@@ -57,7 +57,7 @@ class ModelSelectorPage extends StatelessWidget {
               onTap: () {
                 Get.toNamed(
                   MyRoutes.modelViewer3D,
-                  arguments: {'assetPath': 'assets/GeiminiRev0.glb'},
+                  arguments: {'assetPath': 'assets/GeminiRev0.glb'},
                 );
               },
             ),
