@@ -514,11 +514,11 @@ class _ManipulationPageState extends State<ManipulationPage> {
     if (_containerNode == null) return;
 
     const double speed = 0.008; // meters per update-ish
-    final dy = offset.dx * speed; // joystick x -> world y
+    final dx = offset.dx * speed; // joystick x -> world x
     final dz = offset.dy * speed; // joystick y -> world z
 
     final pos = _containerNode!.position;
-    _containerNode!.position = vector.Vector3(pos.x, pos.y + dy, pos.z + dz);
+    _containerNode!.position = vector.Vector3(pos.x + dx, pos.y, pos.z + dz);
   }
 }
 
