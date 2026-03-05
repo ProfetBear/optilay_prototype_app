@@ -163,7 +163,7 @@ class _ModelViewerEmbedState extends State<ModelViewerEmbed> {
 
           // Hull switch (top-left)
           Positioned(
-            left: 8,
+            right: 8,
             top: 8,
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -180,7 +180,7 @@ class _ModelViewerEmbedState extends State<ModelViewerEmbed> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const Text(
-                      'Rimuovi Carter',
+                      'Carter',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -202,7 +202,7 @@ class _ModelViewerEmbedState extends State<ModelViewerEmbed> {
           if (widget.showFullscreenButton && widget.onFullscreenTap != null)
             Positioned(
               right: 8,
-              top: 8,
+              bottom: 8,
               child: InkWell(
                 onTap: widget.onFullscreenTap,
                 borderRadius: BorderRadius.circular(12),
