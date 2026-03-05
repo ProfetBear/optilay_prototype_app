@@ -48,6 +48,28 @@ class _ManipulationPageState extends State<ManipulationPage> {
   Offset _joystickOffset = Offset.zero;
   bool _joystickActive = false;
 
+  // ------ SIZING STRATEGY (FIXED) ------
+  //
+  // We NEVER assume "scale = 1.0" is realistic, because GLBs often come in mm/cm,
+  // or have baked scale/pivots. Instead:
+  // 1) Temporarily set scale=1.0
+  // 2) Read bounding box
+  // 3) Compute a scale factor so largest dimension == target meters
+  // 4) Apply scale
+  // 5) "Ground" the model so its bottom sits on the plane (y=0) by shifting child Y.
+  //
+  // Coffee-table target is smaller than before.
+  static const double _coffeeTableLargestMeters = 0.35;
+
+  // Per-model realistic largest dimension (meters). TUNE THESE.
+  // If you don't know yet, set approximate real-world "longest side" in meters.
+  final Map<String, double> _realisticLargestByAsset = const {
+    // You can use exact keys if your asset paths match:
+    'assets/ValiantRev11.glb': 7.0,
+    'assets/XBladeRev1.glb': 5.0,
+    'assets/GeminiRev0.glb': 7.0,
+  };
+
   // Helper to get the "without hull" asset path
   String getWithoutHullAsset(String assetPath) {
     final extIndex = assetPath.lastIndexOf('.glb');
@@ -65,10 +87,8 @@ class _ManipulationPageState extends State<ManipulationPage> {
   Future<void> replaceModel({required bool withoutHull}) async {
     if (containerNode == null || glbNode == null) return;
 
-    // Remove previous GLB node
     await arkitController.remove(glbNode!.name);
 
-    // Choose asset path based on switch state
     final newAssetPath =
         withoutHull ? getWithoutHullAsset(widget.assetPath) : widget.assetPath;
 
@@ -77,15 +97,16 @@ class _ManipulationPageState extends State<ManipulationPage> {
       assetType: AssetType.flutterAsset,
       url: newAssetPath,
       position: vector.Vector3.zero(),
-      // keep some non-zero default, then we apply scale mode after bbox is ready
-      scale: vector.Vector3.all(0.01),
+      scale: vector.Vector3.all(
+        1.0,
+      ), // we will compute correct scale mode after bbox is ready
     );
 
     await arkitController.add(glbNode!, parentNodeName: containerNode!.name);
 
     // Apply chosen scale mode once bbox is ready
-    Future.delayed(const Duration(milliseconds: 120), () async {
-      if (glbNode == null) return;
+    Future.delayed(const Duration(milliseconds: 180), () async {
+      if (!mounted || glbNode == null) return;
       await _applyScaleMode();
     });
 
@@ -189,7 +210,7 @@ class _ManipulationPageState extends State<ManipulationPage> {
           if (_showSizePanel)
             Positioned(
               right: 14,
-              top: topSafe + 84 + 44, // aligned under first button
+              top: topSafe + 84 + 44,
               child: _SizePanel(
                 mode: _scaleMode,
                 onSelect: (m) async {
@@ -290,16 +311,15 @@ class _ManipulationPageState extends State<ManipulationPage> {
 
       final pinch = events.first;
 
-      // If it's a new gesture, store the current node scale as the base
       if (_pinchBaseScale == null || pinch.scale == 1.0) {
-        _pinchBaseScale = glbNode!.scale.x; // uniform scaling
+        _pinchBaseScale = glbNode!.scale.x;
       }
 
-      final newScale = (_pinchBaseScale! * pinch.scale).clamp(0.0005, 10.0);
+      final newScale = (_pinchBaseScale! * pinch.scale).clamp(0.0005, 50.0);
       glbNode!.scale = vector.Vector3.all(newScale);
 
-      // Pinch means user took over sizing; reflect UI as "realistic" (manual)
-      // but do not force the toggle.
+      // After manual scaling, keep it grounded (prevents "floating" while scaling)
+      _groundChildOnPlaneBestEffort();
     };
 
     // Two-finger twist -> yaw container
@@ -366,7 +386,7 @@ class _ManipulationPageState extends State<ManipulationPage> {
         assetType: AssetType.flutterAsset,
         url: initialAsset,
         position: vector.Vector3.zero(),
-        scale: vector.Vector3.all(0.01),
+        scale: vector.Vector3.all(1.0), // baseline, we’ll compute proper scale
       );
 
       containerNode = ARKitNode(name: 'model_container', position: pos);
@@ -379,8 +399,8 @@ class _ManipulationPageState extends State<ManipulationPage> {
       _planes.clear();
 
       // Apply scale mode once bbox is ready
-      Future.delayed(const Duration(milliseconds: 150), () async {
-        if (glbNode == null) return;
+      Future.delayed(const Duration(milliseconds: 220), () async {
+        if (!mounted || glbNode == null) return;
         await _applyScaleMode();
       });
     } else {
@@ -395,50 +415,100 @@ class _ManipulationPageState extends State<ManipulationPage> {
     setState(() {});
   }
 
+  double _realisticTargetLargestMetersFor(String assetPath) {
+    // 1) exact match
+    final exact = _realisticLargestByAsset[assetPath];
+    if (exact != null) return exact;
+
+    // 2) heuristic by filename
+    final lower = assetPath.toLowerCase();
+    if (lower.contains('valiant')) return 7.0;
+    if (lower.contains('xblade')) return 5.0;
+    if (lower.contains('gemini')) return 7.0;
+
+    // 3) fallback (still better than assuming 1.0 scale is correct)
+    return 2.0;
+  }
+
   Future<void> _applyScaleMode() async {
     if (glbNode == null) return;
 
-    // Reset pinch baseline so next pinch behaves naturally
     _pinchBaseScale = null;
 
-    if (_scaleMode == _ScaleMode.realistic) {
-      // "Realistic size" = as-authored scale (1.0).
-      glbNode!.scale = vector.Vector3.all(1.0);
-      HapticFeedback.selectionClick();
-      return;
-    }
+    final targetLargest =
+        _scaleMode == _ScaleMode.coffeeTable
+            ? _coffeeTableLargestMeters
+            : _realisticTargetLargestMetersFor(glbNode!.name);
 
-    // "Coffee table size" = auto-scale largest dimension to ~0.7m (adjustable)
-    await _autoScaleToLargest(glbNode!, targetLargestDimensionMeters: 0.7);
+    // IMPORTANT:
+    // - We reset to 1.0, read bbox at that baseline, compute absolute scale, apply it
+    // - Then we ground the model so it sits on the plane
+    glbNode!.scale = vector.Vector3.all(1.0);
+    glbNode!.position = vector.Vector3.zero();
+
+    // bbox can be not-ready for a moment; retry a few times
+    final bbox = await _getBoundingBoxWithRetries(glbNode!, retries: 6);
+    if (bbox == null || bbox.length < 2) return;
+
+    final min = bbox[0];
+    final max = bbox[1];
+
+    final size = vector.Vector3(
+      (max.x - min.x).abs(),
+      (max.y - min.y).abs(),
+      (max.z - min.z).abs(),
+    );
+
+    final largest = [size.x, size.y, size.z].reduce((a, b) => a > b ? a : b);
+    if (largest <= 1e-6) return;
+
+    final s = (targetLargest / largest).clamp(0.0005, 50.0);
+    glbNode!.scale = vector.Vector3.all(s);
+
+    // Ground it: shift child node down by its (scaled) minY, so bottom touches y=0 of container
+    // Since bbox was taken at scale=1, minY is in baseline units.
+    final yShift = (-min.y * s);
+    glbNode!.position = vector.Vector3(0, yShift, 0);
+
     HapticFeedback.selectionClick();
+    if (mounted) setState(() {});
   }
 
-  Future<void> _autoScaleToLargest(
-    ARKitGltfNode node, {
-    double targetLargestDimensionMeters = 0.6,
+  Future<List<vector.Vector3>?> _getBoundingBoxWithRetries(
+    ARKitNode node, {
+    int retries = 5,
   }) async {
-    try {
-      final bbox = await arkitController.getNodeBoundingBox(node);
-      if (bbox.length < 2) return;
+    for (int i = 0; i < retries; i++) {
+      try {
+        final bbox = await arkitController.getNodeBoundingBox(node);
+        if (bbox.length >= 2) return bbox;
+      } catch (_) {
+        // ignore
+      }
+      await Future.delayed(const Duration(milliseconds: 120));
+    }
+    return null;
+  }
+
+  // Best-effort grounding after user pinch scaling
+  void _groundChildOnPlaneBestEffort() {
+    if (glbNode == null) return;
+
+    // Fire and forget; if bbox isn't ready, nothing happens.
+    () async {
+      final bbox = await _getBoundingBoxWithRetries(glbNode!, retries: 2);
+      if (bbox == null || bbox.length < 2) return;
 
       final min = bbox[0];
-      final max = bbox[1];
-
-      final size = vector.Vector3(max.x - min.x, max.y - min.y, max.z - min.z);
-
-      final largest = [
-        size.x.abs(),
-        size.y.abs(),
-        size.z.abs(),
-      ].reduce((a, b) => a > b ? a : b);
-
-      if (largest <= 1e-6) return;
-
-      final s = targetLargestDimensionMeters / largest;
-      node.scale = vector.Vector3.all(s.clamp(0.0005, 10.0));
-    } catch (_) {
-      // ignore if bounding box isn't ready yet
-    }
+      // Here bbox is returned in current node space; still, we can use minY * current scale=1 notion.
+      // Safer: keep position correction incremental: ensure bottom at y=0.
+      //
+      // Because glbNode.position is local to container, we can shift by -minY directly.
+      // NOTE: Depending on plugin internals, bbox may already include scale. This still works:
+      // the "bottom" you see is minY, so shifting by -minY grounds it.
+      final yShift = -min.y;
+      glbNode!.position = vector.Vector3(0, yShift, 0);
+    }();
   }
 
   // ---------- Rotation (compass + gesture) ----------
@@ -446,7 +516,6 @@ class _ManipulationPageState extends State<ManipulationPage> {
   void _setYaw(double yaw) {
     if (containerNode == null) return;
 
-    // Normalize yaw to [-pi, pi] for stable UI display
     final normalized = _normalizeRadians(yaw);
 
     containerNode!.eulerAngles = vector.Vector3(
@@ -478,7 +547,7 @@ class _ManipulationPageState extends State<ManipulationPage> {
     );
     if (rotationResult == null) return;
 
-    final delta = rotationResult.rotation; // radians since gesture start
+    final delta = rotationResult.rotation;
 
     if (_rotationBaseYaw == null || delta.abs() < 1e-6) {
       _rotationBaseYaw = containerNode!.eulerAngles.y;
@@ -494,18 +563,12 @@ class _ManipulationPageState extends State<ManipulationPage> {
     if (!active) return;
     if (containerNode == null) return;
 
-    // offset is in [-1..1] per axis (from joystick widget)
-    // Map to world-space X/Z translation
-    const double speed =
-        0.012; // meters per tick-ish (tuned for responsiveness)
-    // We apply translation directly on change; joystick widget emits frequently during drag.
-
+    // offset is normalized in [-1..1] per axis
+    // Map to world-space X/Z translation (meters)
+    const double speed = 0.010; // slightly slower for precision
     final dx = offset.dx * speed;
     final dz = offset.dy * speed;
 
-    // Convention:
-    //  - dx > 0 moves right (+X)
-    //  - dy > 0 moves down, we map to +Z (toward the user)
     final pos = containerNode!.position;
     containerNode!.position = vector.Vector3(pos.x + dx, pos.y, pos.z + dz);
   }
@@ -638,7 +701,7 @@ class _SizePanel extends StatelessWidget {
               Expanded(
                 child: _DualChoiceButton(
                   title: 'Realistic',
-                  subtitle: '1:1 as model',
+                  subtitle: '1:1 target',
                   selected: mode == _ScaleMode.realistic,
                   onTap: () => onSelect(_ScaleMode.realistic),
                 ),
@@ -647,7 +710,7 @@ class _SizePanel extends StatelessWidget {
               Expanded(
                 child: _DualChoiceButton(
                   title: 'Coffee',
-                  subtitle: '~0.7m max',
+                  subtitle: '~0.35m max',
                   selected: mode == _ScaleMode.coffeeTable,
                   onTap: () => onSelect(_ScaleMode.coffeeTable),
                 ),
@@ -844,7 +907,6 @@ class _CompassPainter extends CustomPainter {
 
     canvas.drawCircle(center, r - 8, ringPaint);
 
-    // cardinal ticks
     final tickPaint =
         Paint()
           ..style = PaintingStyle.stroke
@@ -860,7 +922,6 @@ class _CompassPainter extends CustomPainter {
       canvas.drawLine(p1, p2, tickPaint);
     }
 
-    // pointer (yaw)
     final pointerPaint =
         Paint()
           ..style = PaintingStyle.stroke
@@ -905,7 +966,6 @@ class _JoystickControlState extends State<_JoystickControl> {
   Offset _knob = Offset.zero;
 
   void _emit(bool active) {
-    // Normalize to [-1..1]
     final normalized = Offset(
       (_knob.dx / (outer / 2 - inner / 2)).clamp(-1.0, 1.0),
       (_knob.dy / (outer / 2 - inner / 2)).clamp(-1.0, 1.0),
@@ -949,7 +1009,7 @@ class _JoystickControlState extends State<_JoystickControl> {
                 ? (d) {
                   setState(() {
                     _knob = _clampToCircle(
-                      d.localPosition - Offset(outer / 2, outer / 2),
+                      d.localPosition - const Offset(outer / 2, outer / 2),
                     );
                   });
                   _emit(true);
@@ -961,7 +1021,7 @@ class _JoystickControlState extends State<_JoystickControl> {
                 ? (d) {
                   setState(() {
                     _knob = _clampToCircle(
-                      d.localPosition - Offset(outer / 2, outer / 2),
+                      d.localPosition - const Offset(outer / 2, outer / 2),
                     );
                   });
                   _emit(true);
