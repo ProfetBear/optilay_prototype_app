@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:arkit_plugin/arkit_plugin.dart';
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vector_math/vector_math_64.dart' as vector;
@@ -21,60 +20,46 @@ class _ManipulationPageState extends State<ManipulationPage> {
 
   bool _withoutHull = false;
 
-  // NEW: scale mode toggle
+  // Size mode
   _ScaleMode _scaleMode = _ScaleMode.coffeeTable;
 
-  // World-anchored container; GLB is a child of this
-  ARKitNode? containerNode;
-  ARKitGltfNode? glbNode;
+  // Nodes
+  ARKitNode? _containerNode; // parent node we move/rotate
+  ARKitGltfNode? _glbNode;
 
-  // Gesture baselines
-  double? _pinchBaseScale;
-  double? _rotationBaseYaw;
-
-  // Plane visualization & UI state
+  // Plane viz + status
   bool _hasAnyPlane = false;
-  final Map<String, _PlaneViz> _planes = {}; // anchorId -> viz data
+  final Map<String, _PlaneViz> _planes = {};
 
   // UI: expanded controls
   bool _showSizePanel = false;
   bool _showCompass = false;
   bool _showJoystick = false;
 
-  // Compass state (yaw in radians)
-  double _compassYaw = 0.0;
+  // Compass angle (radians). NOTE: currently applied to X axis as requested.
+  double _angleX = 0.0;
 
-  // Joystick state
-  Offset _joystickOffset = Offset.zero;
-  bool _joystickActive = false;
+  // ---------- SIZING STRATEGY ----------
+  // Always compute uniform scale from bounding box so proportions are preserved.
+  static const double _coffeeTableLargestMeters = 0.15;
 
-  // ------ SIZING STRATEGY (FIXED) ------
-  //
-  // We NEVER assume "scale = 1.0" is realistic, because GLBs often come in mm/cm,
-  // or have baked scale/pivots. Instead:
-  // 1) Temporarily set scale=1.0
-  // 2) Read bounding box
-  // 3) Compute a scale factor so largest dimension == target meters
-  // 4) Apply scale
-  // 5) "Ground" the model so its bottom sits on the plane (y=0) by shifting child Y.
-  //
-  // Coffee-table target is smaller than before.
-  static const double _coffeeTableLargestMeters = 0.35;
-
-  // Per-model realistic largest dimension (meters). TUNE THESE.
-  // If you don't know yet, set approximate real-world "longest side" in meters.
+  // Per-model realistic largest dimension (meters). Tune these.
   final Map<String, double> _realisticLargestByAsset = const {
-    // You can use exact keys if your asset paths match:
-    'assets/ValiantRev11.glb': 7.0,
-    'assets/XBladeRev1.glb': 5.0,
-    'assets/GeminiRev0.glb': 7.0,
+    'assets/ValiantRev11.glb': 5.0,
+    'assets/XBladeRev1.glb': 15.0,
+    'assets/GeminiRev0.glb': 12.0,
   };
 
-  // Helper to get the "without hull" asset path
-  String getWithoutHullAsset(String assetPath) {
+  String _withoutHullAsset(String assetPath) {
     final extIndex = assetPath.lastIndexOf('.glb');
     if (extIndex == -1) return assetPath;
     return assetPath.replaceRange(extIndex, extIndex, '_WithoutHull');
+  }
+
+  String _currentAssetPath() {
+    return _withoutHull
+        ? _withoutHullAsset(widget.assetPath)
+        : widget.assetPath;
   }
 
   @override
@@ -83,35 +68,28 @@ class _ManipulationPageState extends State<ManipulationPage> {
     super.dispose();
   }
 
-  // Remove previous GLB and add new one (with or without hull)
-  Future<void> replaceModel({required bool withoutHull}) async {
-    if (containerNode == null || glbNode == null) return;
+  Future<void> _replaceModel() async {
+    if (_containerNode == null) return;
 
-    await arkitController.remove(glbNode!.name);
+    if (_glbNode != null) {
+      await arkitController.remove(_glbNode!.name);
+    }
 
-    final newAssetPath =
-        withoutHull ? getWithoutHullAsset(widget.assetPath) : widget.assetPath;
+    final asset = _currentAssetPath();
 
-    glbNode = ARKitGltfNode(
-      name: newAssetPath,
+    _glbNode = ARKitGltfNode(
+      name: asset,
       assetType: AssetType.flutterAsset,
-      url: newAssetPath,
+      url: asset,
       position: vector.Vector3.zero(),
-      scale: vector.Vector3.all(
-        1.0,
-      ), // we will compute correct scale mode after bbox is ready
+      scale: vector.Vector3.all(1.0),
     );
 
-    await arkitController.add(glbNode!, parentNodeName: containerNode!.name);
+    await arkitController.add(_glbNode!, parentNodeName: _containerNode!.name);
 
-    // Apply chosen scale mode once bbox is ready
-    Future.delayed(const Duration(milliseconds: 180), () async {
-      if (!mounted || glbNode == null) return;
+    Future.delayed(const Duration(milliseconds: 260), () async {
+      if (!mounted || _glbNode == null) return;
       await _applyScaleMode();
-    });
-
-    setState(() {
-      _withoutHull = withoutHull;
     });
   }
 
@@ -131,7 +109,10 @@ class _ManipulationPageState extends State<ManipulationPage> {
               Switch(
                 value: _withoutHull,
                 onChanged: (bool value) async {
-                  await replaceModel(withoutHull: value);
+                  setState(() => _withoutHull = value);
+                  if (_containerNode != null) {
+                    await _replaceModel();
+                  }
                 },
               ),
               const SizedBox(width: 8),
@@ -144,11 +125,14 @@ class _ManipulationPageState extends State<ManipulationPage> {
           ARKitSceneView(
             planeDetection: ARPlaneDetection.horizontal,
             showFeaturePoints: false,
-            enableTapRecognizer: true,
-            enablePinchRecognizer: true,
-            enablePanRecognizer: false, // translation now via joystick
-            enableRotationRecognizer: true, // twist rotation for yaw
-            onARKitViewCreated: onARKitViewCreated,
+
+            // Remove all direct interactions
+            enableTapRecognizer: false,
+            enablePinchRecognizer: false,
+            enablePanRecognizer: false,
+            enableRotationRecognizer: false,
+
+            onARKitViewCreated: _onARKitViewCreated,
           ),
 
           // Right-side action buttons (expanders)
@@ -206,13 +190,14 @@ class _ManipulationPageState extends State<ManipulationPage> {
             ),
           ),
 
-          // Size panel (dual buttons)
+          // Size panel
           if (_showSizePanel)
             Positioned(
               right: 14,
               top: topSafe + 84 + 44,
               child: _SizePanel(
                 mode: _scaleMode,
+                enabled: _containerNode != null,
                 onSelect: (m) async {
                   setState(() => _scaleMode = m);
                   await _applyScaleMode();
@@ -220,36 +205,33 @@ class _ManipulationPageState extends State<ManipulationPage> {
               ),
             ),
 
-          // Compass overlay (rotate around Y)
+          // Compass overlay (currently rotates around X axis as requested)
           if (_showCompass)
             Positioned(
               right: 14,
               top: topSafe + 84 + 44 + 54,
               child: _CompassControl(
-                yaw: _compassYaw,
-                enabled: containerNode != null,
-                onYawChanged: (yaw) {
-                  _setYaw(yaw);
-                },
+                yaw: _angleX,
+                enabled: _containerNode != null,
+                onYawChanged: (a) => _setAngleX(a),
               ),
             ),
 
-          // Joystick overlay (translate on X/Z)
+          // Joystick overlay (translate)
           if (_showJoystick)
             Positioned(
               left: 16,
               bottom: 110,
               child: _JoystickControl(
-                enabled: containerNode != null,
+                enabled: _containerNode != null,
                 onChange: (offset, active) {
-                  _joystickOffset = offset;
-                  _joystickActive = active;
-                  _applyJoystickTranslation(offset, active);
+                  if (!active) return;
+                  _applyJoystickTranslation(offset);
                 },
               ),
             ),
 
-          // Overlay banner to indicate plane detection status
+          // Banner
           Positioned(
             left: 16,
             right: 16,
@@ -262,7 +244,9 @@ class _ManipulationPageState extends State<ManipulationPage> {
                       ? _Banner(
                         color: Colors.green.withOpacity(0.9),
                         text:
-                            'Plane detected — tap to place, then pinch/rotate or use controls',
+                            _containerNode == null
+                                ? 'Plane detected — placing model…'
+                                : 'Use Size / Rotate / Move controls',
                         icon: Icons.grid_on,
                       )
                       : _Banner(
@@ -277,53 +261,23 @@ class _ManipulationPageState extends State<ManipulationPage> {
     );
   }
 
-  void onARKitViewCreated(ARKitController controller) {
+  void _onARKitViewCreated(ARKitController controller) {
     arkitController = controller;
 
-    // --- Plane anchor callbacks to visualize & track status ---
-    arkitController.onAddNodeForAnchor = (anchor) {
+    arkitController.onAddNodeForAnchor = (anchor) async {
       if (anchor is! ARKitPlaneAnchor) return;
       _addPlaneViz(anchor);
+
+      // Auto-place model on first detected plane (no tap)
+      if (_containerNode == null) {
+        await _placeOnPlaneAnchor(anchor);
+      }
     };
 
     arkitController.onUpdateNodeForAnchor = (anchor) {
       if (anchor is! ARKitPlaneAnchor) return;
       _updatePlaneViz(anchor);
     };
-
-    // --- Tap to place / move at world point on plane ---
-    arkitController.onARTap = (hits) {
-      ARKitTestResult? planeHit;
-      for (final h in hits) {
-        if (h.type == ARKitHitTestResultType.existingPlaneUsingExtent) {
-          planeHit = h;
-          break;
-        }
-      }
-      if (planeHit == null) return;
-      _placeAtWorldPoint(planeHit.worldTransform);
-    };
-
-    // --- Gestures ---
-    // Pinch -> scale GLB (manual override)
-    arkitController.onNodePinch = (events) {
-      if (glbNode == null || events.isEmpty) return;
-
-      final pinch = events.first;
-
-      if (_pinchBaseScale == null || pinch.scale == 1.0) {
-        _pinchBaseScale = glbNode!.scale.x;
-      }
-
-      final newScale = (_pinchBaseScale! * pinch.scale).clamp(0.0005, 50.0);
-      glbNode!.scale = vector.Vector3.all(newScale);
-
-      // After manual scaling, keep it grounded (prevents "floating" while scaling)
-      _groundChildOnPlaneBestEffort();
-    };
-
-    // Two-finger twist -> yaw container
-    arkitController.onNodeRotation = _onRotationHandler;
   }
 
   // ---------- Plane visualization helpers ----------
@@ -334,7 +288,7 @@ class _ManipulationPageState extends State<ManipulationPage> {
       height: anchor.extent.z,
       materials: [
         ARKitMaterial(
-          transparency: 0.35,
+          transparency: 0.30,
           diffuse: ARKitMaterialProperty.color(Colors.green),
         ),
       ],
@@ -351,6 +305,7 @@ class _ManipulationPageState extends State<ManipulationPage> {
 
     final wasNone = !_hasAnyPlane;
     _planes[anchor.identifier] = _PlaneViz(plane: plane, node: node);
+
     if (wasNone) {
       setState(() => _hasAnyPlane = true);
       HapticFeedback.mediumImpact();
@@ -366,109 +321,88 @@ class _ManipulationPageState extends State<ManipulationPage> {
     viz.node.position = vector.Vector3(anchor.center.x, 0, anchor.center.z);
   }
 
-  // ---------- Placement & scaling ----------
+  // ---------- Placement (NO TAP) ----------
 
-  Future<void> _placeAtWorldPoint(Matrix4 world) async {
-    final pos = vector.Vector3(
-      world.getColumn(3).x,
-      world.getColumn(3).y,
-      world.getColumn(3).z,
+  Future<void> _placeOnPlaneAnchor(ARKitPlaneAnchor anchor) async {
+    _containerNode = ARKitNode(
+      name: 'model_container',
+      position: vector.Vector3(anchor.center.x, 0, anchor.center.z),
+      // Apply current compass rotation to X axis
+      eulerAngles: vector.Vector3(_angleX, 0, 0),
     );
 
-    if (containerNode == null) {
-      final initialAsset =
-          _withoutHull
-              ? getWithoutHullAsset(widget.assetPath)
-              : widget.assetPath;
+    await arkitController.add(_containerNode!, parentNodeName: anchor.nodeName);
 
-      glbNode = ARKitGltfNode(
-        name: initialAsset,
-        assetType: AssetType.flutterAsset,
-        url: initialAsset,
-        position: vector.Vector3.zero(),
-        scale: vector.Vector3.all(1.0), // baseline, we’ll compute proper scale
-      );
+    final asset = _currentAssetPath();
+    _glbNode = ARKitGltfNode(
+      name: asset,
+      assetType: AssetType.flutterAsset,
+      url: asset,
+      position: vector.Vector3.zero(),
+      scale: vector.Vector3.all(1.0),
+    );
 
-      containerNode = ARKitNode(name: 'model_container', position: pos);
+    await arkitController.add(_glbNode!, parentNodeName: _containerNode!.name);
 
-      await arkitController.add(containerNode!);
-      await arkitController.add(glbNode!, parentNodeName: containerNode!.name);
+    // Hide planes after placement
+    _planes.forEach((_, viz) => arkitController.remove(viz.node.name));
+    _planes.clear();
 
-      // Hide planes after placement
-      _planes.forEach((_, viz) => arkitController.remove(viz.node.name));
-      _planes.clear();
+    Future.delayed(const Duration(milliseconds: 300), () async {
+      if (!mounted || _glbNode == null) return;
+      await _applyScaleMode();
+      if (mounted) setState(() {});
+    });
 
-      // Apply scale mode once bbox is ready
-      Future.delayed(const Duration(milliseconds: 220), () async {
-        if (!mounted || glbNode == null) return;
-        await _applyScaleMode();
-      });
-    } else {
-      containerNode!.position = pos;
-    }
-
-    _pinchBaseScale = null;
-
-    // Initialize compass yaw from current container yaw
-    _rotationBaseYaw = containerNode!.eulerAngles.y;
-    _compassYaw = _rotationBaseYaw ?? 0.0;
     setState(() {});
   }
 
+  // ---------- Scaling (uniform only) ----------
+
   double _realisticTargetLargestMetersFor(String assetPath) {
-    // 1) exact match
     final exact = _realisticLargestByAsset[assetPath];
     if (exact != null) return exact;
 
-    // 2) heuristic by filename
     final lower = assetPath.toLowerCase();
     if (lower.contains('valiant')) return 7.0;
     if (lower.contains('xblade')) return 5.0;
     if (lower.contains('gemini')) return 7.0;
 
-    // 3) fallback (still better than assuming 1.0 scale is correct)
     return 2.0;
   }
 
   Future<void> _applyScaleMode() async {
-    if (glbNode == null) return;
+    if (_glbNode == null) return;
 
-    _pinchBaseScale = null;
-
+    final assetKey = _glbNode!.name;
     final targetLargest =
         _scaleMode == _ScaleMode.coffeeTable
             ? _coffeeTableLargestMeters
-            : _realisticTargetLargestMetersFor(glbNode!.name);
+            : _realisticTargetLargestMetersFor(assetKey);
 
-    // IMPORTANT:
-    // - We reset to 1.0, read bbox at that baseline, compute absolute scale, apply it
-    // - Then we ground the model so it sits on the plane
-    glbNode!.scale = vector.Vector3.all(1.0);
-    glbNode!.position = vector.Vector3.zero();
+    // Reset local transforms to baseline before measuring
+    _glbNode!.scale = vector.Vector3.all(1.0);
+    _glbNode!.position = vector.Vector3.zero();
 
-    // bbox can be not-ready for a moment; retry a few times
-    final bbox = await _getBoundingBoxWithRetries(glbNode!, retries: 6);
+    final bbox = await _getBoundingBoxWithRetries(_glbNode!, retries: 8);
     if (bbox == null || bbox.length < 2) return;
 
     final min = bbox[0];
     final max = bbox[1];
 
-    final size = vector.Vector3(
-      (max.x - min.x).abs(),
-      (max.y - min.y).abs(),
-      (max.z - min.z).abs(),
-    );
+    final sx = (max.x - min.x).abs();
+    final sy = (max.y - min.y).abs();
+    final sz = (max.z - min.z).abs();
 
-    final largest = [size.x, size.y, size.z].reduce((a, b) => a > b ? a : b);
+    final largest = [sx, sy, sz].reduce((a, b) => a > b ? a : b);
     if (largest <= 1e-6) return;
 
-    final s = (targetLargest / largest).clamp(0.0005, 50.0);
-    glbNode!.scale = vector.Vector3.all(s);
+    final s = (targetLargest / largest).clamp(0.0005, 120.0);
+    _glbNode!.scale = vector.Vector3.all(s);
 
-    // Ground it: shift child node down by its (scaled) minY, so bottom touches y=0 of container
-    // Since bbox was taken at scale=1, minY is in baseline units.
+    // Ground to plane: shift so bottom touches y=0
     final yShift = (-min.y * s);
-    glbNode!.position = vector.Vector3(0, yShift, 0);
+    _glbNode!.position = vector.Vector3(0, yShift, 0);
 
     HapticFeedback.selectionClick();
     if (mounted) setState(() {});
@@ -476,7 +410,7 @@ class _ManipulationPageState extends State<ManipulationPage> {
 
   Future<List<vector.Vector3>?> _getBoundingBoxWithRetries(
     ARKitNode node, {
-    int retries = 5,
+    int retries = 6,
   }) async {
     for (int i = 0; i < retries; i++) {
       try {
@@ -485,49 +419,25 @@ class _ManipulationPageState extends State<ManipulationPage> {
       } catch (_) {
         // ignore
       }
-      await Future.delayed(const Duration(milliseconds: 120));
+      await Future.delayed(const Duration(milliseconds: 140));
     }
     return null;
   }
 
-  // Best-effort grounding after user pinch scaling
-  void _groundChildOnPlaneBestEffort() {
-    if (glbNode == null) return;
+  // ---------- Rotation (COMPASS -> X AXIS) ----------
 
-    // Fire and forget; if bbox isn't ready, nothing happens.
-    () async {
-      final bbox = await _getBoundingBoxWithRetries(glbNode!, retries: 2);
-      if (bbox == null || bbox.length < 2) return;
+  void _setAngleX(double angle) {
+    if (_containerNode == null) return;
 
-      final min = bbox[0];
-      // Here bbox is returned in current node space; still, we can use minY * current scale=1 notion.
-      // Safer: keep position correction incremental: ensure bottom at y=0.
-      //
-      // Because glbNode.position is local to container, we can shift by -minY directly.
-      // NOTE: Depending on plugin internals, bbox may already include scale. This still works:
-      // the "bottom" you see is minY, so shifting by -minY grounds it.
-      final yShift = -min.y;
-      glbNode!.position = vector.Vector3(0, yShift, 0);
-    }();
-  }
+    final normalized = _normalizeRadians(angle);
 
-  // ---------- Rotation (compass + gesture) ----------
-
-  void _setYaw(double yaw) {
-    if (containerNode == null) return;
-
-    final normalized = _normalizeRadians(yaw);
-
-    containerNode!.eulerAngles = vector.Vector3(
-      containerNode!.eulerAngles.x,
-      normalized,
-      containerNode!.eulerAngles.z,
+    _containerNode!.eulerAngles = vector.Vector3(
+      normalized, // X
+      _containerNode!.eulerAngles.y,
+      _containerNode!.eulerAngles.z,
     );
 
-    setState(() {
-      _compassYaw = normalized;
-      _rotationBaseYaw = normalized;
-    });
+    setState(() => _angleX = normalized);
   }
 
   double _normalizeRadians(double a) {
@@ -537,51 +447,28 @@ class _ManipulationPageState extends State<ManipulationPage> {
     return x;
   }
 
-  // Incremental rotation handler (two-finger twist)
-  void _onRotationHandler(List<ARKitNodeRotationResult> rotationEvents) {
-    if (glbNode == null || containerNode == null || rotationEvents.isEmpty)
-      return;
+  // ---------- Translation (joystick only) ----------
 
-    final rotationResult = rotationEvents.firstWhereOrNull(
-      (e) => e.nodeName == glbNode!.name,
-    );
-    if (rotationResult == null) return;
+  void _applyJoystickTranslation(Offset offset) {
+    if (_containerNode == null) return;
 
-    final delta = rotationResult.rotation;
-
-    if (_rotationBaseYaw == null || delta.abs() < 1e-6) {
-      _rotationBaseYaw = containerNode!.eulerAngles.y;
-    }
-
-    final newYaw = (_rotationBaseYaw ?? 0.0) + delta;
-    _setYaw(newYaw);
-  }
-
-  // ---------- Translation (joystick) ----------
-
-  void _applyJoystickTranslation(Offset offset, bool active) {
-    if (!active) return;
-    if (containerNode == null) return;
-
-    // offset is normalized in [-1..1] per axis
-    // Map to world-space X/Z translation (meters)
-    const double speed = 0.010; // slightly slower for precision
+    const double speed = 0.008; // meters per update-ish
     final dx = offset.dx * speed;
     final dz = offset.dy * speed;
 
-    final pos = containerNode!.position;
-    containerNode!.position = vector.Vector3(pos.x + dx, pos.y, pos.z + dz);
+    final pos = _containerNode!.position;
+    _containerNode!.position = vector.Vector3(pos.x + dx, pos.y, pos.z + dz);
   }
 }
 
-// Small helper for plane viz bookkeeping
+// ---------- UI Widgets ----------
+
 class _PlaneViz {
   _PlaneViz({required this.plane, required this.node});
   final ARKitPlane plane;
   final ARKitNode node;
 }
 
-// Simple pill banner widget
 class _Banner extends StatelessWidget {
   const _Banner({required this.color, required this.text, required this.icon});
 
@@ -646,7 +533,6 @@ class _ActionPillButton extends StatelessWidget {
           boxShadow: [
             BoxShadow(
               blurRadius: 14,
-              spreadRadius: 0,
               offset: const Offset(0, 6),
               color: Colors.black.withOpacity(0.22),
             ),
@@ -669,9 +555,14 @@ class _ActionPillButton extends StatelessWidget {
 }
 
 class _SizePanel extends StatelessWidget {
-  const _SizePanel({required this.mode, required this.onSelect});
+  const _SizePanel({
+    required this.mode,
+    required this.enabled,
+    required this.onSelect,
+  });
 
   final _ScaleMode mode;
+  final bool enabled;
   final ValueChanged<_ScaleMode> onSelect;
 
   @override
@@ -703,6 +594,7 @@ class _SizePanel extends StatelessWidget {
                   title: 'Realistic',
                   subtitle: '1:1 target',
                   selected: mode == _ScaleMode.realistic,
+                  enabled: enabled,
                   onTap: () => onSelect(_ScaleMode.realistic),
                 ),
               ),
@@ -710,13 +602,24 @@ class _SizePanel extends StatelessWidget {
               Expanded(
                 child: _DualChoiceButton(
                   title: 'Coffee',
-                  subtitle: '~0.35m max',
+                  subtitle: '~0.15m max',
                   selected: mode == _ScaleMode.coffeeTable,
+                  enabled: enabled,
                   onTap: () => onSelect(_ScaleMode.coffeeTable),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          if (!enabled)
+            Text(
+              'Place model first',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Colors.black.withOpacity(0.45),
+              ),
+            ),
         ],
       ),
     );
@@ -728,12 +631,14 @@ class _DualChoiceButton extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.selected,
+    required this.enabled,
     required this.onTap,
   });
 
   final String title;
   final String subtitle;
   final bool selected;
+  final bool enabled;
   final VoidCallback onTap;
 
   @override
@@ -741,33 +646,36 @@ class _DualChoiceButton extends StatelessWidget {
     final bg = selected ? Colors.black : Colors.white;
     final fg = selected ? Colors.white : Colors.black;
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.black.withOpacity(0.12)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: TextStyle(color: fg, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              style: TextStyle(
-                color: fg.withOpacity(0.75),
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+    return Opacity(
+      opacity: enabled ? 1.0 : 0.55,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.black.withOpacity(0.12)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(color: fg, fontWeight: FontWeight.w800),
               ),
-            ),
-          ],
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: fg.withOpacity(0.75),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -853,9 +761,7 @@ class _CompassDialState extends State<_CompassDial> {
 
     final center = Offset(size.width / 2, size.height / 2);
     final v = localPos - center;
-
-    // angle 0 is up; atan2 gives angle from +x, so rotate by +pi/2
-    final raw = math.atan2(v.dy, v.dx) + math.pi / 2;
+    final raw = math.atan2(v.dy, v.dx) + math.pi / 2; // angle 0 is up
     setState(() => _localYaw = raw);
     widget.onYawChanged(raw);
   }
@@ -865,7 +771,6 @@ class _CompassDialState extends State<_CompassDial> {
     return LayoutBuilder(
       builder: (_, c) {
         final s = Size(c.maxWidth, c.maxHeight);
-
         return GestureDetector(
           onPanStart: (d) => _handle(d.localPosition, s),
           onPanUpdate: (d) => _handle(d.localPosition, s),
@@ -890,7 +795,6 @@ class _CompassDialState extends State<_CompassDial> {
 
 class _CompassPainter extends CustomPainter {
   _CompassPainter({required this.yaw, required this.enabled});
-
   final double yaw;
   final bool enabled;
 
@@ -929,7 +833,7 @@ class _CompassPainter extends CustomPainter {
           ..strokeCap = StrokeCap.round
           ..color = Colors.black.withOpacity(enabled ? 0.85 : 0.35);
 
-    final a = yaw - math.pi / 2; // convert back to standard unit circle
+    final a = yaw - math.pi / 2;
     final tip = center + Offset(math.cos(a), math.sin(a)) * (r - 22);
     canvas.drawLine(center, tip, pointerPaint);
 
@@ -942,17 +846,14 @@ class _CompassPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _CompassPainter oldDelegate) {
-    return oldDelegate.yaw != yaw || oldDelegate.enabled != enabled;
-  }
+  bool shouldRepaint(covariant _CompassPainter oldDelegate) =>
+      oldDelegate.yaw != yaw || oldDelegate.enabled != enabled;
 }
 
 class _JoystickControl extends StatefulWidget {
   const _JoystickControl({required this.enabled, required this.onChange});
 
   final bool enabled;
-
-  /// offset is normalized in [-1..1] (dx,dy). active indicates drag active.
   final void Function(Offset offset, bool active) onChange;
 
   @override
@@ -1030,9 +931,7 @@ class _JoystickControlState extends State<_JoystickControl> {
         onPanEnd:
             widget.enabled
                 ? (_) {
-                  setState(() {
-                    _knob = Offset.zero;
-                  });
+                  setState(() => _knob = Offset.zero);
                   _emit(false);
                 }
                 : null,
