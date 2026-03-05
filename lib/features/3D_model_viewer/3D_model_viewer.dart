@@ -107,7 +107,7 @@ class _ModelViewerPageState extends State<ModelViewerPage> {
         actions: [
           Row(
             children: [
-              Text('Hull', style: TextStyle(color: MyColors.primary)),
+              Text('Rimuovi Carter', style: TextStyle(color: MyColors.primary)),
               Switch(
                 value: _withoutHull,
                 onChanged: _toggleHull,
