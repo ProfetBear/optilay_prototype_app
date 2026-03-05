@@ -15,61 +15,40 @@ class ManipulationPage extends StatefulWidget {
 
 enum _ScaleMode { realistic, coffeeTable }
 
-/// Centralized movement remap.
-/// Change this to match what "feels correct" in your current model coordinate situation.
-enum _MovementAxisMode {
-  /// Joystick X -> world X, Joystick Y -> world Z
-  standardXZ,
-
-  /// Joystick X -> world Y, Joystick Y -> world Z  (your current "X is Y really" feeling)
-  swapXY_keepZ,
-
-  /// Joystick X -> world X, Joystick Y -> world Y
-  xyPlane,
-
-  /// Joystick X -> world Z, Joystick Y -> world X
-  swapXZ,
-}
-
 class _ManipulationPageState extends State<ManipulationPage> {
   late ARKitController arkitController;
 
   bool _withoutHull = false;
 
+  // Size mode
   _ScaleMode _scaleMode = _ScaleMode.coffeeTable;
 
-  ARKitNode? _containerNode;
+  // Nodes
+  ARKitNode? _containerNode; // parent node we move/rotate
   ARKitGltfNode? _glbNode;
 
+  // Plane viz + status
   bool _hasAnyPlane = false;
   final Map<String, _PlaneViz> _planes = {};
 
-  // Bottom controls state
+  // UI: expanded controls
   bool _showSizePanel = false;
   bool _showCompass = false;
   bool _showJoystick = false;
   bool _showHeight = false;
 
-  // Rotation (applied to X axis as requested earlier)
+  // Compass angle (radians). Applied to X axis (as you requested).
   double _angleX = 0.0;
 
-  // Height slider value in meters (applied to chosen "height axis")
+  // Height control (meters). Applied to WORLD X (per your note: "X is Y really").
+  // We apply incrementally so it plays nicely with joystick moves.
   double _heightMeters = 0.0;
 
-  // ---------- TUNABLES ----------
+  // ---------- SIZING STRATEGY ----------
+  // Always compute uniform scale from bounding box so proportions are preserved.
   static const double _coffeeTableLargestMeters = 0.15;
 
-  // Increase movement speed in Move mode
-  // (was 0.008 — bumping a lot; tune freely)
-  double _moveSpeed = 0.03;
-
-  // Axis mapping for joystick movement
-  _MovementAxisMode _movementAxisMode = _MovementAxisMode.swapXY_keepZ;
-
-  // Height axis: you said "X(which is Y really)". Keep as X for now (can change below).
-  // If you want height to be world Y instead, change to: _applyHeightOnWorldY
-  final bool _applyHeightOnWorldX = true;
-
+  // Per-model realistic largest dimension (meters). Tune these.
   final Map<String, double> _realisticLargestByAsset = const {
     'assets/ValiantRev11.glb': 10.0,
     'assets/XBladeRev1.glb': 15.0,
@@ -119,18 +98,9 @@ class _ManipulationPageState extends State<ManipulationPage> {
     });
   }
 
-  void _closeOtherPanels(String keep) {
-    setState(() {
-      if (keep != 'size') _showSizePanel = false;
-      if (keep != 'rotate') _showCompass = false;
-      if (keep != 'move') _showJoystick = false;
-      if (keep != 'height') _showHeight = false;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    final bottomSafe = MediaQuery.of(context).padding.bottom;
+    final topSafe = MediaQuery.of(context).padding.top;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -160,91 +130,135 @@ class _ManipulationPageState extends State<ManipulationPage> {
           ARKitSceneView(
             planeDetection: ARPlaneDetection.horizontal,
             showFeaturePoints: false,
+
+            // Remove all direct interactions
             enableTapRecognizer: false,
             enablePinchRecognizer: false,
             enablePanRecognizer: false,
             enableRotationRecognizer: false,
+
             onARKitViewCreated: _onARKitViewCreated,
           ),
 
-          // Banner
+          // Right-side action buttons (expanders)
           Positioned(
-            left: 16,
-            right: 16,
-            bottom: 24 + bottomSafe + 72, // keep above controls
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 250),
-              opacity: 1.0,
-              child:
-                  _hasAnyPlane
-                      ? _Banner(
-                        color: Colors.green.withOpacity(0.9),
-                        text:
-                            _containerNode == null
-                                ? 'Plane detected — placing model…'
-                                : 'Use controls to rotate/move/scale',
-                        icon: Icons.grid_on,
-                      )
-                      : _Banner(
-                        color: Colors.black.withOpacity(0.7),
-                        text: 'Move your device to detect a horizontal surface',
-                        icon: Icons.phone_iphone,
-                      ),
+            right: 14,
+            top: topSafe + 84,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                _ActionPillButton(
+                  icon: Icons.straighten,
+                  label: 'Size',
+                  active: _showSizePanel,
+                  onTap: () {
+                    setState(() {
+                      _showSizePanel = !_showSizePanel;
+                      if (_showSizePanel) {
+                        _showCompass = false;
+                        _showJoystick = false;
+                        _showHeight = false;
+                      }
+                    });
+                  },
+                ),
+                const SizedBox(height: 10),
+                _ActionPillButton(
+                  icon: Icons.explore,
+                  label: 'Rotate',
+                  active: _showCompass,
+                  onTap: () {
+                    setState(() {
+                      _showCompass = !_showCompass;
+                      if (_showCompass) {
+                        _showSizePanel = false;
+                        _showJoystick = false;
+                        _showHeight = false;
+                      }
+                    });
+                  },
+                ),
+                const SizedBox(height: 10),
+                _ActionPillButton(
+                  icon: Icons.sports_esports,
+                  label: 'Move',
+                  active: _showJoystick,
+                  onTap: () {
+                    setState(() {
+                      _showJoystick = !_showJoystick;
+                      if (_showJoystick) {
+                        _showSizePanel = false;
+                        _showCompass = false;
+                        _showHeight = false;
+                      }
+                    });
+                  },
+                ),
+                const SizedBox(height: 10),
+                _ActionPillButton(
+                  icon: Icons.height,
+                  label: 'Height',
+                  active: _showHeight,
+                  onTap: () {
+                    setState(() {
+                      _showHeight = !_showHeight;
+                      if (_showHeight) {
+                        _showSizePanel = false;
+                        _showCompass = false;
+                        _showJoystick = false;
+                      }
+                    });
+                  },
+                ),
+              ],
             ),
           ),
 
-          // Panels (bottom-center, above buttons)
+          // Size panel
           if (_showSizePanel)
             Positioned(
-              left: 0,
-              right: 0,
-              bottom: bottomSafe + 72 + 14,
-              child: Center(
-                child: _SizePanel(
-                  mode: _scaleMode,
-                  enabled: _containerNode != null,
-                  onSelect: (m) async {
-                    setState(() => _scaleMode = m);
-                    await _applyScaleMode();
-                  },
-                ),
+              right: 14,
+              bottom: 110,
+              child: _SizePanel(
+                mode: _scaleMode,
+                enabled: _containerNode != null,
+                onSelect: (m) async {
+                  setState(() => _scaleMode = m);
+                  await _applyScaleMode();
+                },
               ),
             ),
 
+          // Compass overlay (rotates around X axis)
           if (_showCompass)
             Positioned(
-              left: 0,
-              right: 0,
-              bottom: bottomSafe + 72 + 14,
-              child: Center(
-                child: _CompassControl(
-                  yaw: _angleX,
-                  enabled: _containerNode != null,
-                  onYawChanged: (a) => _setAngleX(a),
-                ),
+              right: 14,
+              bottom: 110,
+              child: _CompassControl(
+                yaw: _angleX,
+                enabled: _containerNode != null,
+                onYawChanged: (a) => _setAngleX(a),
               ),
             ),
 
+          // Height panel (slider)
           if (_showHeight)
             Positioned(
-              left: 0,
-              right: 0,
-              bottom: bottomSafe + 72 + 14,
-              child: Center(
-                child: _HeightPanel(
-                  enabled: _containerNode != null,
-                  valueMeters: _heightMeters,
-                  onChanged: (v) => _setHeightMeters(v),
-                  onReset: () => _setHeightMeters(0.0),
-                ),
+              right: 14,
+              bottom: 110,
+              child: _HeightPanel(
+                enabled: _containerNode != null,
+                valueMeters: _heightMeters,
+                onChanged: (v) => _setHeightMeters(v),
+                onReset: () => _setHeightMeters(0.0),
               ),
             ),
 
+          // Joystick overlay (translate)
           if (_showJoystick)
             Positioned(
-              left: 0,
-              right: 0,
-              bottom: bottomSafe + 72 + 14,
+              right: 14,
+              bottom: 110,
               child: Center(
                 child: _JoystickControl(
                   enabled: _containerNode != null,
@@ -256,67 +270,29 @@ class _ManipulationPageState extends State<ManipulationPage> {
               ),
             ),
 
-          // Bottom-center control bar
+          // Banner
           Positioned(
-            left: 0,
-            right: 0,
-            bottom: bottomSafe + 14,
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.45),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: Colors.white.withOpacity(0.12)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _ActionPillButton(
-                      icon: Icons.straighten,
-                      label: 'Size',
-                      active: _showSizePanel,
-                      onTap: () {
-                        setState(() => _showSizePanel = !_showSizePanel);
-                        _closeOtherPanels(_showSizePanel ? 'size' : '');
-                      },
-                    ),
-                    const SizedBox(width: 10),
-                    _ActionPillButton(
-                      icon: Icons.explore,
-                      label: 'Rotate',
-                      active: _showCompass,
-                      onTap: () {
-                        setState(() => _showCompass = !_showCompass);
-                        _closeOtherPanels(_showCompass ? 'rotate' : '');
-                      },
-                    ),
-                    const SizedBox(width: 10),
-                    _ActionPillButton(
-                      icon: Icons.sports_esports,
-                      label: 'Move',
-                      active: _showJoystick,
-                      onTap: () {
-                        setState(() => _showJoystick = !_showJoystick);
-                        _closeOtherPanels(_showJoystick ? 'move' : '');
-                      },
-                    ),
-                    const SizedBox(width: 10),
-                    _ActionPillButton(
-                      icon: Icons.height,
-                      label: 'Height',
-                      active: _showHeight,
-                      onTap: () {
-                        setState(() => _showHeight = !_showHeight);
-                        _closeOtherPanels(_showHeight ? 'height' : '');
-                      },
-                    ),
-                  ],
-                ),
-              ),
+            left: 16,
+            right: 16,
+            bottom: 24,
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 250),
+              opacity: 1.0,
+              child:
+                  _hasAnyPlane
+                      ? _Banner(
+                        color: Colors.green.withOpacity(0.9),
+                        text:
+                            _containerNode == null
+                                ? 'Plane detected — placing model…'
+                                : 'Use Size / Rotate / Move / Height controls',
+                        icon: Icons.grid_on,
+                      )
+                      : _Banner(
+                        color: Colors.black.withOpacity(0.7),
+                        text: 'Move your device to detect a horizontal surface',
+                        icon: Icons.phone_iphone,
+                      ),
             ),
           ),
         ],
@@ -331,6 +307,7 @@ class _ManipulationPageState extends State<ManipulationPage> {
       if (anchor is! ARKitPlaneAnchor) return;
       _addPlaneViz(anchor);
 
+      // Auto-place model on first detected plane (no tap)
       if (_containerNode == null) {
         await _placeOnPlaneAnchor(anchor);
       }
@@ -341,6 +318,8 @@ class _ManipulationPageState extends State<ManipulationPage> {
       _updatePlaneViz(anchor);
     };
   }
+
+  // ---------- Plane visualization helpers ----------
 
   void _addPlaneViz(ARKitPlaneAnchor anchor) {
     final plane = ARKitPlane(
@@ -365,6 +344,7 @@ class _ManipulationPageState extends State<ManipulationPage> {
 
     final wasNone = !_hasAnyPlane;
     _planes[anchor.identifier] = _PlaneViz(plane: plane, node: node);
+
     if (wasNone) {
       setState(() => _hasAnyPlane = true);
       HapticFeedback.mediumImpact();
@@ -380,10 +360,13 @@ class _ManipulationPageState extends State<ManipulationPage> {
     viz.node.position = vector.Vector3(anchor.center.x, 0, anchor.center.z);
   }
 
+  // ---------- Placement (NO TAP) ----------
+
   Future<void> _placeOnPlaneAnchor(ARKitPlaneAnchor anchor) async {
     _containerNode = ARKitNode(
       name: 'model_container',
       position: vector.Vector3(anchor.center.x, 0, anchor.center.z),
+      // Apply current compass rotation to X axis
       eulerAngles: vector.Vector3(_angleX, 0, 0),
     );
 
@@ -400,6 +383,7 @@ class _ManipulationPageState extends State<ManipulationPage> {
 
     await arkitController.add(_glbNode!, parentNodeName: _containerNode!.name);
 
+    // Hide planes after placement
     _planes.forEach((_, viz) => arkitController.remove(viz.node.name));
     _planes.clear();
 
@@ -411,6 +395,8 @@ class _ManipulationPageState extends State<ManipulationPage> {
 
     setState(() {});
   }
+
+  // ---------- Scaling (uniform only) ----------
 
   double _realisticTargetLargestMetersFor(String assetPath) {
     final exact = _realisticLargestByAsset[assetPath];
@@ -433,6 +419,7 @@ class _ManipulationPageState extends State<ManipulationPage> {
             ? _coffeeTableLargestMeters
             : _realisticTargetLargestMetersFor(assetKey);
 
+    // Reset local transforms to baseline before measuring
     _glbNode!.scale = vector.Vector3.all(1.0);
     _glbNode!.position = vector.Vector3.zero();
 
@@ -452,6 +439,7 @@ class _ManipulationPageState extends State<ManipulationPage> {
     final s = (targetLargest / largest).clamp(0.0005, 120.0);
     _glbNode!.scale = vector.Vector3.all(s);
 
+    // Ground to plane: shift so bottom touches y=0
     final yShift = (-min.y * s);
     _glbNode!.position = vector.Vector3(0, yShift, 0);
 
@@ -467,18 +455,23 @@ class _ManipulationPageState extends State<ManipulationPage> {
       try {
         final bbox = await arkitController.getNodeBoundingBox(node);
         if (bbox.length >= 2) return bbox;
-      } catch (_) {}
+      } catch (_) {
+        // ignore
+      }
       await Future.delayed(const Duration(milliseconds: 140));
     }
     return null;
   }
 
+  // ---------- Rotation (COMPASS -> X AXIS) ----------
+
   void _setAngleX(double angle) {
     if (_containerNode == null) return;
 
     final normalized = _normalizeRadians(angle);
+
     _containerNode!.eulerAngles = vector.Vector3(
-      normalized,
+      normalized, // X
       _containerNode!.eulerAngles.y,
       _containerNode!.eulerAngles.z,
     );
@@ -493,6 +486,8 @@ class _ManipulationPageState extends State<ManipulationPage> {
     return x;
   }
 
+  // ---------- Height (slider -> WORLD X) ----------
+
   void _setHeightMeters(double newHeight) {
     if (_containerNode == null) {
       setState(() => _heightMeters = newHeight);
@@ -502,76 +497,32 @@ class _ManipulationPageState extends State<ManipulationPage> {
     final delta = newHeight - _heightMeters;
     final pos = _containerNode!.position;
 
-    // Apply delta on world X (or change to world Y if you prefer)
-    _containerNode!.position =
-        _applyHeightOnWorldX
-            ? vector.Vector3(pos.x + delta, pos.y, pos.z)
-            : vector.Vector3(pos.x, pos.y + delta, pos.z);
+    // Apply delta on WORLD X axis (as you requested)
+    _containerNode!.position = vector.Vector3(pos.x, pos.y + delta, pos.z);
 
     setState(() => _heightMeters = newHeight);
   }
 
-  // ✅ This is where you change the axis of movement.
-  // Pick the mapping that feels right for your model frame.
+  // ---------- Translation (joystick only) ----------
+  //
+  // IMPORTANT: You said your model/frame is off and height feels like X.
+  // To avoid joystick fighting height, we DO NOT move on X here.
+  // Joystick X => WORLD Y
+  // Joystick Y => WORLD Z
+  //
   void _applyJoystickTranslation(Offset offset) {
     if (_containerNode == null) return;
 
+    const double speed = 0.008; // meters per update-ish
+    final dy = offset.dx * speed; // joystick x -> world y
+    final dz = offset.dy * speed; // joystick y -> world z
+
     final pos = _containerNode!.position;
-    final s = _moveSpeed;
-
-    // NOTE: dy is offset.dy in screen space. If you want "up" to go forward, invert it:
-    // final oy = -offset.dy;
-    final ox = offset.dx;
-    final oy = offset.dy;
-
-    switch (_movementAxisMode) {
-      case _MovementAxisMode.standardXZ:
-        {
-          final dx = ox * s;
-          final dz = oy * s;
-          _containerNode!.position = vector.Vector3(
-            pos.x + dx,
-            pos.y,
-            pos.z + dz,
-          );
-          break;
-        }
-      case _MovementAxisMode.swapXY_keepZ:
-        {
-          final dy = ox * s;
-          final dz = oy * s;
-          _containerNode!.position = vector.Vector3(
-            pos.x,
-            pos.y + dy,
-            pos.z + dz,
-          );
-          break;
-        }
-      case _MovementAxisMode.xyPlane:
-        {
-          final dx = ox * s;
-          final dy = oy * s;
-          _containerNode!.position = vector.Vector3(
-            pos.x + dx,
-            pos.y + dy,
-            pos.z,
-          );
-          break;
-        }
-      case _MovementAxisMode.swapXZ:
-        {
-          final dz = ox * s;
-          final dx = oy * s;
-          _containerNode!.position = vector.Vector3(
-            pos.x + dx,
-            pos.y,
-            pos.z + dz,
-          );
-          break;
-        }
-    }
+    _containerNode!.position = vector.Vector3(pos.x, pos.y + dy, pos.z + dz);
   }
 }
+
+// ---------- UI Widgets ----------
 
 class _PlaneViz {
   _PlaneViz({required this.plane, required this.node});
@@ -635,8 +586,18 @@ class _ActionPillButton extends StatelessWidget {
           color: bg,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: Colors.white.withOpacity(active ? 0.0 : 0.12),
+            color:
+                active
+                    ? Colors.black.withOpacity(0.08)
+                    : Colors.white.withOpacity(0.12),
           ),
+          boxShadow: [
+            BoxShadow(
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+              color: Colors.black.withOpacity(0.22),
+            ),
+          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -668,12 +629,19 @@ class _SizePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 240,
-      padding: const EdgeInsets.all(12),
+      width: 220,
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(enabled ? 0.95 : 0.6),
+        color: Colors.white.withOpacity(0.95),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.black.withOpacity(0.08)),
+        boxShadow: [
+          BoxShadow(
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+            color: Colors.black.withOpacity(0.22),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -703,6 +671,16 @@ class _SizePanel extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          if (!enabled)
+            Text(
+              'Place model first',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Colors.black.withOpacity(0.45),
+              ),
+            ),
         ],
       ),
     );
@@ -780,13 +758,25 @@ class _HeightPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bg =
+        enabled
+            ? Colors.white.withOpacity(0.95)
+            : Colors.white.withOpacity(0.6);
+
     return Container(
-      width: 240,
+      width: 220,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(enabled ? 0.95 : 0.6),
+        color: bg,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.black.withOpacity(0.08)),
+        boxShadow: [
+          BoxShadow(
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+            color: Colors.black.withOpacity(0.22),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -805,6 +795,7 @@ class _HeightPanel extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 6),
           Text(
             '${valueMeters.toStringAsFixed(2)} m',
             style: TextStyle(
@@ -812,13 +803,29 @@ class _HeightPanel extends StatelessWidget {
               color: Colors.black.withOpacity(0.7),
             ),
           ),
-          Slider(
-            value: valueMeters.clamp(-1.0, 1.0),
-            min: -1.0,
-            max: 1.0,
-            divisions: 200,
-            onChanged: enabled ? onChanged : null,
+          const SizedBox(height: 8),
+          Opacity(
+            opacity: enabled ? 1.0 : 0.55,
+            child: Slider(
+              value: valueMeters.clamp(-1.0, 1.0),
+              min: -1.0,
+              max: 1.0,
+              divisions: 200,
+              onChanged: enabled ? onChanged : null,
+            ),
           ),
+          if (!enabled)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'Place model first',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black.withOpacity(0.45),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -839,14 +846,26 @@ class _CompassControl extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const double size = 170;
+    final bg =
+        enabled
+            ? Colors.white.withOpacity(0.95)
+            : Colors.white.withOpacity(0.6);
+
     return Container(
       width: size,
       height: size,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(enabled ? 0.95 : 0.6),
+        color: bg,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.black.withOpacity(0.08)),
+        boxShadow: [
+          BoxShadow(
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+            color: Colors.black.withOpacity(0.22),
+          ),
+        ],
       ),
       child: _CompassDial(
         yaw: yaw,
@@ -892,7 +911,7 @@ class _CompassDialState extends State<_CompassDial> {
 
     final center = Offset(size.width / 2, size.height / 2);
     final v = localPos - center;
-    final raw = math.atan2(v.dy, v.dx) + math.pi / 2;
+    final raw = math.atan2(v.dy, v.dx) + math.pi / 2; // angle 0 is up
     setState(() => _localYaw = raw);
     widget.onYawChanged(raw);
   }
@@ -909,7 +928,7 @@ class _CompassDialState extends State<_CompassDial> {
             painter: _CompassPainter(yaw: _localYaw, enabled: widget.enabled),
             child: Center(
               child: Text(
-                widget.enabled ? 'Rotate' : 'Place\nfirst',
+                widget.enabled ? 'Rotate' : 'Place model\nfirst',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
@@ -939,6 +958,7 @@ class _CompassPainter extends CustomPainter {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 5
           ..color = Colors.black.withOpacity(enabled ? 0.16 : 0.08);
+
     canvas.drawCircle(center, r - 8, ringPaint);
 
     final tickPaint =
@@ -971,6 +991,7 @@ class _CompassPainter extends CustomPainter {
         Paint()
           ..style = PaintingStyle.fill
           ..color = Colors.black.withOpacity(enabled ? 0.9 : 0.35);
+
     canvas.drawCircle(tip, 8, knobPaint);
   }
 
@@ -1025,6 +1046,13 @@ class _JoystickControlState extends State<_JoystickControl> {
         color: bg,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: Colors.black.withOpacity(0.08)),
+        boxShadow: [
+          BoxShadow(
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+            color: Colors.black.withOpacity(0.22),
+          ),
+        ],
       ),
       child: GestureDetector(
         onPanStart:
@@ -1092,6 +1120,7 @@ class _JoystickPainter extends CustomPainter {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 5
           ..color = Colors.black.withOpacity(enabled ? 0.16 : 0.08);
+
     canvas.drawCircle(center, r - 10, ringPaint);
 
     final crossPaint =
@@ -1099,6 +1128,7 @@ class _JoystickPainter extends CustomPainter {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2
           ..color = Colors.black.withOpacity(enabled ? 0.18 : 0.10);
+
     canvas.drawLine(
       Offset(center.dx - (r - 18), center.dy),
       Offset(center.dx + (r - 18), center.dy),
@@ -1108,6 +1138,23 @@ class _JoystickPainter extends CustomPainter {
       Offset(center.dx, center.dy - (r - 18)),
       Offset(center.dx, center.dy + (r - 18)),
       crossPaint,
+    );
+
+    final labelStyle = TextStyle(
+      color: Colors.black.withOpacity(enabled ? 0.55 : 0.35),
+      fontWeight: FontWeight.w800,
+      fontSize: 12,
+    );
+
+    final tp = TextPainter(
+      text: TextSpan(text: enabled ? 'Move' : 'Place first', style: labelStyle),
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.center,
+    )..layout();
+
+    tp.paint(
+      canvas,
+      Offset(center.dx - tp.width / 2, center.dy - tp.height / 2),
     );
   }
 
