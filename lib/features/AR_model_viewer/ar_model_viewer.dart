@@ -45,7 +45,7 @@ class _ManipulationPageState extends State<ManipulationPage> {
 
   // Per-model realistic largest dimension (meters). Tune these.
   final Map<String, double> _realisticLargestByAsset = const {
-    'assets/ValiantRev11.glb': 5.0,
+    'assets/ValiantRev11.glb': 10.0,
     'assets/XBladeRev1.glb': 15.0,
     'assets/GeminiRev0.glb': 12.0,
   };
