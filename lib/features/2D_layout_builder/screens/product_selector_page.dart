@@ -1,3 +1,4 @@
+// lib/features/model_selector/model_selector_page.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:optilay_prototype_app/common/widgets/option_card.dart';
@@ -25,39 +26,48 @@ class ModelSelectorPage extends StatelessWidget {
           children: [
             OptionCard(
               title: 'Valiant',
-              description: 'Show Valiant',
+              description: 'Open product page',
               icon: Icons.precision_manufacturing,
               color: MyColors.primary,
               onTap: () {
                 Get.toNamed(
-                  MyRoutes.modelViewer3D,
-                  arguments: {'assetPath': 'assets/ValiantRev11.glb'},
+                  MyRoutes.productPage,
+                  arguments: {
+                    'productName': 'Valiant',
+                    'assetPath': 'assets/ValiantRev11.glb',
+                  },
                 );
               },
             ),
             const SizedBox(height: 20),
             OptionCard(
               title: 'XBlade',
-              description: 'Show XBlade',
+              description: 'Open product page',
               icon: Icons.precision_manufacturing,
               color: MyColors.primary,
               onTap: () {
                 Get.toNamed(
-                  MyRoutes.modelViewer3D,
-                  arguments: {'assetPath': 'assets/XBladeRev1.glb'},
+                  MyRoutes.productPage,
+                  arguments: {
+                    'productName': 'XBlade',
+                    'assetPath': 'assets/XBladeRev1.glb',
+                  },
                 );
               },
             ),
             const SizedBox(height: 20),
             OptionCard(
               title: 'Gemini',
-              description: 'Show Gemini',
+              description: 'Open product page',
               icon: Icons.precision_manufacturing,
               color: MyColors.primary,
               onTap: () {
                 Get.toNamed(
-                  MyRoutes.modelViewer3D,
-                  arguments: {'assetPath': 'assets/GeminiRev0.glb'},
+                  MyRoutes.productPage,
+                  arguments: {
+                    'productName': 'Gemini',
+                    'assetPath': 'assets/GeminiRev0.glb',
+                  },
                 );
               },
             ),

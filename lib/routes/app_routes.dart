@@ -2,8 +2,9 @@ import 'package:get/get.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/screens/layout_editor_page.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/screens/layout_viewer_page.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/screens/new_canva_page.dart';
+import 'package:optilay_prototype_app/features/2D_layout_builder/screens/product_page.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/screens/project_selector_page.dart';
-import 'package:optilay_prototype_app/features/Catalog/product_selector.dart';
+import 'package:optilay_prototype_app/features/2D_layout_builder/screens/product_selector_page.dart';
 import 'package:optilay_prototype_app/features/3D_model_viewer/3D_model_viewer.dart';
 import 'package:optilay_prototype_app/features/AR_model_viewer/ar_model_selector.dart';
 import 'package:optilay_prototype_app/features/AR_model_viewer/ar_model_viewer.dart';
@@ -28,7 +29,20 @@ class AppRoutes {
       transition: Transition.fadeIn,
       transitionDuration: Duration(milliseconds: 50),
     ),
+    // Catalog Feature
+    GetPage(
+      name: MyRoutes.productSelector,
+      page: () => ModelSelectorPage(),
+      transition: Transition.fadeIn,
+      transitionDuration: Duration(milliseconds: 50),
+    ),
 
+    GetPage(
+      name: MyRoutes.productPage,
+      page: () => ProductPage(),
+      transition: Transition.fadeIn,
+      transitionDuration: Duration(milliseconds: 50),
+    ),
     // -- Layout Builder Feature
     GetPage(
       name: MyRoutes.layoutProjectSelector,
@@ -57,14 +71,8 @@ class AppRoutes {
     ),
 
     GetPage(
-      name: MyRoutes.productSelector,
-      page: () => ModelSelectorPage(),
-      transition: Transition.fadeIn,
-      transitionDuration: Duration(milliseconds: 50),
-    ),
-    GetPage(
       name: MyRoutes.modelViewer3D,
-      page: () => ModelViewerPage(filename: Get.arguments?['assetPath'] ?? ''),
+      page: () => ModelViewerFullScreenPage(),
       transition: Transition.fadeIn,
       transitionDuration: Duration(milliseconds: 50),
     ),
