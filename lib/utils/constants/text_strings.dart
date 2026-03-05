@@ -63,8 +63,8 @@ class MyTexts {
       "Il tuo account è stato creato con successo.";
 
   // -- Home
-  static const String homeTitle = "OptiLay Prototype";
-  static const String homeAppbarTitle = "OptiLay Prototype";
+  static const String homeTitle = "OptiLay";
+  static const String homeAppbarTitle = "OptiLay";
   static const String homeWelcome = "Benvenuto in OptiLay";
   static const String homeDescription = "Questa è un'applicazione demo";
   static const String home3DViewerButtonTitle = "Catalogo 3D";
@@ -96,6 +96,9 @@ class MyTexts {
   // -- Route Titles (optional)
   static const String newCanvaTitle = "Nuovo Layout";
   static const String loadCanvaTitle = "Ripristina Canva";
+  static const String beginVisitButtonTitle = "Inizia la visita";
+  static const String beginVisitButtonDesc =
+      "Inizia a esplorare il nostro catalogo 3D";
 
   // Layout Editor 2D
 

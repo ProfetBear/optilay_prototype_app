@@ -40,32 +40,12 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
             const SizedBox(height: 32),
             OptionCard(
-              title: MyTexts.home3DViewerButtonTitle,
-              description: MyTexts.home3DViewerButtonDesc,
+              title: MyTexts.beginVisitButtonTitle,
+              description: MyTexts.beginVisitButtonDesc,
               icon: Icons.view_in_ar,
               color: MyColors.primary,
               onTap: () {
-                Get.toNamed(MyRoutes.modelSelector3D);
-              },
-            ),
-            const SizedBox(height: 20),
-            OptionCard(
-              title: MyTexts.homeArViewerButtonTitle,
-              description: MyTexts.homeArViewerButtonDesc,
-              icon: Icons.design_services,
-              color: MyColors.primary,
-              onTap: () {
-                Get.toNamed(MyRoutes.modelSelectorAR);
-              },
-            ),
-            const SizedBox(height: 20),
-            OptionCard(
-              title: MyTexts.homeCanvaManagerButtonTitle,
-              description: MyTexts.homeCanvaManagerButtonDesc,
-              icon: Icons.design_services,
-              color: MyColors.primary,
-              onTap: () {
-                Get.toNamed(MyRoutes.layoutProjectSelector);
+                Get.toNamed(MyRoutes.productSelector);
               },
             ),
           ],

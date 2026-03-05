@@ -7,7 +7,8 @@ class MyRoutes {
   static const newCanva = '/new_canva';
   static const loadCanva = '/load_canva';
 
-  static const modelSelector3D = '/model_selector';
+  static const productSelector = '/product_selector';
+
   static const modelViewer3D = '/model_viewer';
   static const modelSelectorAR = '/ar-model-selector';
   static const modelViewerAR = '/ar_viewer';

@@ -12,7 +12,7 @@ class ModelSelectorPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Select 3D Model',
+          'Select Product',
           style: TextStyle(color: Colors.white),
         ),
         centerTitle: true,

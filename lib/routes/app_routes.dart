@@ -3,7 +3,7 @@ import 'package:optilay_prototype_app/features/2D_layout_builder/screens/layout_
 import 'package:optilay_prototype_app/features/2D_layout_builder/screens/layout_viewer_page.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/screens/new_canva_page.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/screens/project_selector_page.dart';
-import 'package:optilay_prototype_app/features/3D_model_viewer/3D_model_selector.dart';
+import 'package:optilay_prototype_app/features/Catalog/product_selector.dart';
 import 'package:optilay_prototype_app/features/3D_model_viewer/3D_model_viewer.dart';
 import 'package:optilay_prototype_app/features/AR_model_viewer/ar_model_selector.dart';
 import 'package:optilay_prototype_app/features/AR_model_viewer/ar_model_viewer.dart';
@@ -57,33 +57,30 @@ class AppRoutes {
     ),
 
     GetPage(
-      name: MyRoutes.modelSelector3D,
+      name: MyRoutes.productSelector,
       page: () => ModelSelectorPage(),
       transition: Transition.fadeIn,
       transitionDuration: Duration(milliseconds: 50),
     ),
     GetPage(
-  name: MyRoutes.modelViewer3D,
-  page: () => ModelViewerPage(
-    filename: Get.arguments?['assetPath'] ?? '',
-  ),
-  transition: Transition.fadeIn,
-  transitionDuration: Duration(milliseconds: 50),
-),
+      name: MyRoutes.modelViewer3D,
+      page: () => ModelViewerPage(filename: Get.arguments?['assetPath'] ?? ''),
+      transition: Transition.fadeIn,
+      transitionDuration: Duration(milliseconds: 50),
+    ),
     GetPage(
-    name: MyRoutes.modelSelectorAR,
-    page: () => const ARModelSelectorPage(),
-    transition: Transition.fadeIn,
-    transitionDuration: Duration(milliseconds: 50),
-  ),
+      name: MyRoutes.modelSelectorAR,
+      page: () => const ARModelSelectorPage(),
+      transition: Transition.fadeIn,
+      transitionDuration: Duration(milliseconds: 50),
+    ),
     GetPage(
-  name: MyRoutes.modelViewerAR,
-  page: () => ManipulationPage(
-    assetPath: Get.arguments?['assetPath'] ?? '',
-  ),
-  transition: Transition.fadeIn,
-  transitionDuration: Duration(milliseconds: 50),
-),
+      name: MyRoutes.modelViewerAR,
+      page:
+          () => ManipulationPage(assetPath: Get.arguments?['assetPath'] ?? ''),
+      transition: Transition.fadeIn,
+      transitionDuration: Duration(milliseconds: 50),
+    ),
     // -- TODO Authentication
     /*
     GetPage(
