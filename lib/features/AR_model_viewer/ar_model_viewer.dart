@@ -37,15 +37,13 @@ class _ManipulationPageState extends State<ManipulationPage> {
   bool _showJoystick = false;
   bool _showHeight = false;
 
-  // Compass angle (radians). Applied to X axis (as you requested).
+  // Compass angle (radians). Applied to X axis.
   double _angleX = 0.0;
 
-  // Height control (meters). Applied to WORLD X (per your note: "X is Y really").
-  // We apply incrementally so it plays nicely with joystick moves.
+  // Height control (meters). (You currently apply to WORLD Y)
   double _heightMeters = 0.0;
 
   // ---------- SIZING STRATEGY ----------
-  // Always compute uniform scale from bounding box so proportions are preserved.
   static const double _coffeeTableLargestMeters = 0.15;
 
   // Per-model realistic largest dimension (meters). Tune these.
@@ -54,6 +52,18 @@ class _ManipulationPageState extends State<ManipulationPage> {
     'assets/XBladeRev1.glb': 15.0,
     'assets/GeminiRev0.glb': 12.0,
   };
+
+  // ---------- NEW: MOVEMENT & HEIGHT TUNING ----------
+  // Faster + farther movement: increase base speed substantially.
+  // Old: 0.008
+  static const double _moveSpeed = 0.05;
+
+  // Height range 5x: old slider was [-1, +1] => now [-5, +5]
+  static const double _heightRangeMeters = 5.0;
+
+  // Optional safety clamp for translation so you can move "much further away"
+  // without becoming infinite. Adjust or remove if you want totally unlimited.
+  static const double _maxDistanceFromOriginMeters = 50.0;
 
   String _withoutHullAsset(String assetPath) {
     final extIndex = assetPath.lastIndexOf('.glb');
@@ -130,17 +140,14 @@ class _ManipulationPageState extends State<ManipulationPage> {
           ARKitSceneView(
             planeDetection: ARPlaneDetection.horizontal,
             showFeaturePoints: false,
-
-            // Remove all direct interactions
             enableTapRecognizer: false,
             enablePinchRecognizer: false,
             enablePanRecognizer: false,
             enableRotationRecognizer: false,
-
             onARKitViewCreated: _onARKitViewCreated,
           ),
 
-          // Right-side action buttons (expanders)
+          // Right-side action buttons
           Positioned(
             right: 14,
             top: topSafe + 84,
@@ -229,7 +236,7 @@ class _ManipulationPageState extends State<ManipulationPage> {
               ),
             ),
 
-          // Compass overlay (rotates around X axis)
+          // Compass panel
           if (_showCompass)
             Positioned(
               right: 14,
@@ -241,7 +248,7 @@ class _ManipulationPageState extends State<ManipulationPage> {
               ),
             ),
 
-          // Height panel (slider)
+          // Height panel (5x range)
           if (_showHeight)
             Positioned(
               right: 14,
@@ -249,24 +256,24 @@ class _ManipulationPageState extends State<ManipulationPage> {
               child: _HeightPanel(
                 enabled: _containerNode != null,
                 valueMeters: _heightMeters,
+                minMeters: -_heightRangeMeters,
+                maxMeters: _heightRangeMeters,
                 onChanged: (v) => _setHeightMeters(v),
                 onReset: () => _setHeightMeters(0.0),
               ),
             ),
 
-          // Joystick overlay (translate)
+          // Joystick panel (faster + farther)
           if (_showJoystick)
             Positioned(
               right: 14,
               bottom: 110,
-              child: Center(
-                child: _JoystickControl(
-                  enabled: _containerNode != null,
-                  onChange: (offset, active) {
-                    if (!active) return;
-                    _applyJoystickTranslation(offset);
-                  },
-                ),
+              child: _JoystickControl(
+                enabled: _containerNode != null,
+                onChange: (offset, active) {
+                  if (!active) return;
+                  _applyJoystickTranslation(offset);
+                },
               ),
             ),
 
@@ -307,7 +314,6 @@ class _ManipulationPageState extends State<ManipulationPage> {
       if (anchor is! ARKitPlaneAnchor) return;
       _addPlaneViz(anchor);
 
-      // Auto-place model on first detected plane (no tap)
       if (_containerNode == null) {
         await _placeOnPlaneAnchor(anchor);
       }
@@ -318,8 +324,6 @@ class _ManipulationPageState extends State<ManipulationPage> {
       _updatePlaneViz(anchor);
     };
   }
-
-  // ---------- Plane visualization helpers ----------
 
   void _addPlaneViz(ARKitPlaneAnchor anchor) {
     final plane = ARKitPlane(
@@ -360,13 +364,10 @@ class _ManipulationPageState extends State<ManipulationPage> {
     viz.node.position = vector.Vector3(anchor.center.x, 0, anchor.center.z);
   }
 
-  // ---------- Placement (NO TAP) ----------
-
   Future<void> _placeOnPlaneAnchor(ARKitPlaneAnchor anchor) async {
     _containerNode = ARKitNode(
       name: 'model_container',
       position: vector.Vector3(anchor.center.x, 0, anchor.center.z),
-      // Apply current compass rotation to X axis
       eulerAngles: vector.Vector3(_angleX, 0, 0),
     );
 
@@ -383,7 +384,6 @@ class _ManipulationPageState extends State<ManipulationPage> {
 
     await arkitController.add(_glbNode!, parentNodeName: _containerNode!.name);
 
-    // Hide planes after placement
     _planes.forEach((_, viz) => arkitController.remove(viz.node.name));
     _planes.clear();
 
@@ -395,8 +395,6 @@ class _ManipulationPageState extends State<ManipulationPage> {
 
     setState(() {});
   }
-
-  // ---------- Scaling (uniform only) ----------
 
   double _realisticTargetLargestMetersFor(String assetPath) {
     final exact = _realisticLargestByAsset[assetPath];
@@ -419,7 +417,6 @@ class _ManipulationPageState extends State<ManipulationPage> {
             ? _coffeeTableLargestMeters
             : _realisticTargetLargestMetersFor(assetKey);
 
-    // Reset local transforms to baseline before measuring
     _glbNode!.scale = vector.Vector3.all(1.0);
     _glbNode!.position = vector.Vector3.zero();
 
@@ -439,7 +436,6 @@ class _ManipulationPageState extends State<ManipulationPage> {
     final s = (targetLargest / largest).clamp(0.0005, 120.0);
     _glbNode!.scale = vector.Vector3.all(s);
 
-    // Ground to plane: shift so bottom touches y=0
     final yShift = (-min.y * s);
     _glbNode!.position = vector.Vector3(0, yShift, 0);
 
@@ -455,15 +451,11 @@ class _ManipulationPageState extends State<ManipulationPage> {
       try {
         final bbox = await arkitController.getNodeBoundingBox(node);
         if (bbox.length >= 2) return bbox;
-      } catch (_) {
-        // ignore
-      }
+      } catch (_) {}
       await Future.delayed(const Duration(milliseconds: 140));
     }
     return null;
   }
-
-  // ---------- Rotation (COMPASS -> X AXIS) ----------
 
   void _setAngleX(double angle) {
     if (_containerNode == null) return;
@@ -471,7 +463,7 @@ class _ManipulationPageState extends State<ManipulationPage> {
     final normalized = _normalizeRadians(angle);
 
     _containerNode!.eulerAngles = vector.Vector3(
-      normalized, // X
+      normalized,
       _containerNode!.eulerAngles.y,
       _containerNode!.eulerAngles.z,
     );
@@ -486,8 +478,7 @@ class _ManipulationPageState extends State<ManipulationPage> {
     return x;
   }
 
-  // ---------- Height (slider -> WORLD X) ----------
-
+  // Height slider (now allows +/- 5 meters)
   void _setHeightMeters(double newHeight) {
     if (_containerNode == null) {
       setState(() => _heightMeters = newHeight);
@@ -497,28 +488,29 @@ class _ManipulationPageState extends State<ManipulationPage> {
     final delta = newHeight - _heightMeters;
     final pos = _containerNode!.position;
 
-    // Apply delta on WORLD X axis (as you requested)
+    // Keep your current behavior: height moves along WORLD Y
     _containerNode!.position = vector.Vector3(pos.x, pos.y + delta, pos.z);
 
     setState(() => _heightMeters = newHeight);
   }
 
-  // ---------- Translation (joystick only) ----------
-  //
-  // IMPORTANT: You said your model/frame is off and height feels like X.
-  // To avoid joystick fighting height, we DO NOT move on X here.
-  // Joystick X => WORLD Y
-  // Joystick Y => WORLD Z
-  //
+  // Joystick translation (faster + farther)
   void _applyJoystickTranslation(Offset offset) {
     if (_containerNode == null) return;
 
-    const double speed = 0.008; // meters per update-ish
-    final dx = offset.dx * speed; // joystick x -> world x
-    final dz = offset.dy * speed; // joystick y -> world z
+    final dx = offset.dx * _moveSpeed;
+    final dz = offset.dy * _moveSpeed;
 
     final pos = _containerNode!.position;
-    _containerNode!.position = vector.Vector3(pos.x + dx, pos.y, pos.z + dz);
+    final next = vector.Vector3(pos.x + dx, pos.y, pos.z + dz);
+
+    // Optional: clamp to a max radius so you don't lose the model forever
+    if (next.length > _maxDistanceFromOriginMeters) {
+      final scaled = next.normalized() * _maxDistanceFromOriginMeters;
+      _containerNode!.position = scaled;
+    } else {
+      _containerNode!.position = next;
+    }
   }
 }
 
@@ -671,16 +663,6 @@ class _SizePanel extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          if (!enabled)
-            Text(
-              'Place model first',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: Colors.black.withOpacity(0.45),
-              ),
-            ),
         ],
       ),
     );
@@ -747,12 +729,16 @@ class _HeightPanel extends StatelessWidget {
   const _HeightPanel({
     required this.enabled,
     required this.valueMeters,
+    required this.minMeters,
+    required this.maxMeters,
     required this.onChanged,
     required this.onReset,
   });
 
   final bool enabled;
   final double valueMeters;
+  final double minMeters;
+  final double maxMeters;
   final ValueChanged<double> onChanged;
   final VoidCallback onReset;
 
@@ -807,25 +793,13 @@ class _HeightPanel extends StatelessWidget {
           Opacity(
             opacity: enabled ? 1.0 : 0.55,
             child: Slider(
-              value: valueMeters.clamp(-1.0, 1.0),
-              min: -1.0,
-              max: 1.0,
+              value: valueMeters.clamp(minMeters, maxMeters),
+              min: minMeters,
+              max: maxMeters,
               divisions: 200,
               onChanged: enabled ? onChanged : null,
             ),
           ),
-          if (!enabled)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                'Place model first',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black.withOpacity(0.45),
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -911,7 +885,7 @@ class _CompassDialState extends State<_CompassDial> {
 
     final center = Offset(size.width / 2, size.height / 2);
     final v = localPos - center;
-    final raw = math.atan2(v.dy, v.dx) + math.pi / 2; // angle 0 is up
+    final raw = math.atan2(v.dy, v.dx) + math.pi / 2;
     setState(() => _localYaw = raw);
     widget.onYawChanged(raw);
   }
@@ -1138,23 +1112,6 @@ class _JoystickPainter extends CustomPainter {
       Offset(center.dx, center.dy - (r - 18)),
       Offset(center.dx, center.dy + (r - 18)),
       crossPaint,
-    );
-
-    final labelStyle = TextStyle(
-      color: Colors.black.withOpacity(enabled ? 0.55 : 0.35),
-      fontWeight: FontWeight.w800,
-      fontSize: 12,
-    );
-
-    final tp = TextPainter(
-      text: TextSpan(text: enabled ? 'Move' : 'Place first', style: labelStyle),
-      textDirection: TextDirection.ltr,
-      textAlign: TextAlign.center,
-    )..layout();
-
-    tp.paint(
-      canvas,
-      Offset(center.dx - tp.width / 2, center.dy - tp.height / 2),
     );
   }
 
