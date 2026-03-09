@@ -1,6 +1,7 @@
 // lib/features/product/product_page.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:optilay_prototype_app/features/2D_layout_builder/screens/layout_procedure_page.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/widgets/technical_drawing_embed.dart';
 import 'package:optilay_prototype_app/features/3D_model_viewer/3D_model_viewer_embed.dart';
 import 'package:optilay_prototype_app/routes/routes.dart';
@@ -23,10 +24,13 @@ class _ProductPageState extends State<ProductPage> {
     final String assetPath =
         (args['assetPath'] as String?) ?? 'assets/model.glb';
 
-    // Optional 2D technical drawing asset.
-    // Pass this from selector/product catalog when available.
     final String drawingAssetPath =
         (args['drawingAssetPath'] as String?) ?? 'assets/crane.svg';
+
+    final double drawingWidthMeters =
+        (args['drawingWidthMeters'] as num?)?.toDouble() ?? 2.0;
+    final double drawingHeightMeters =
+        (args['drawingHeightMeters'] as num?)?.toDouble() ?? 2.0;
 
     return Scaffold(
       appBar: AppBar(
@@ -37,7 +41,6 @@ class _ProductPageState extends State<ProductPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // Top viewer with 2D / 3D switch
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
               child: AspectRatio(
@@ -90,8 +93,6 @@ class _ProductPageState extends State<ProductPage> {
                 ),
               ),
             ),
-
-            // Tech details
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -126,8 +127,6 @@ class _ProductPageState extends State<ProductPage> {
                 ],
               ),
             ),
-
-            // Bottom split actions
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: Row(
@@ -163,13 +162,13 @@ class _ProductPageState extends State<ProductPage> {
                       height: 54,
                       child: ElevatedButton.icon(
                         onPressed: () {
-                          Get.toNamed(
-                            MyRoutes.layoutEditor2D,
-                            arguments: {
-                              'productName': productName,
-                              'machineDrawingAssetPath': drawingAssetPath,
-                              'autoImportPdf': true,
-                            },
+                          Get.to(
+                            () => LayoutProcedurePage(
+                              productName: productName,
+                              machineDrawingAssetPath: drawingAssetPath,
+                              machineWidthMeters: drawingWidthMeters,
+                              machineHeightMeters: drawingHeightMeters,
+                            ),
                           );
                         },
                         icon: const Icon(Icons.grid_view_rounded),
