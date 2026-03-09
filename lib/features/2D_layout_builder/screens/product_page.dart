@@ -1,7 +1,6 @@
 // lib/features/product/product_page.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:optilay_prototype_app/features/2D_layout_builder/screens/layout_procedure_page.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/widgets/technical_drawing_embed.dart';
 import 'package:optilay_prototype_app/features/3D_model_viewer/3D_model_viewer_embed.dart';
 import 'package:optilay_prototype_app/routes/routes.dart';
@@ -162,13 +161,14 @@ class _ProductPageState extends State<ProductPage> {
                       height: 54,
                       child: ElevatedButton.icon(
                         onPressed: () {
-                          Get.to(
-                            () => LayoutProcedurePage(
-                              productName: productName,
-                              machineDrawingAssetPath: drawingAssetPath,
-                              machineWidthMeters: drawingWidthMeters,
-                              machineHeightMeters: drawingHeightMeters,
-                            ),
+                          Get.toNamed(
+                            MyRoutes.layoutProcedure,
+                            arguments: {
+                              'productName': productName,
+                              'machineDrawingAssetPath': drawingAssetPath,
+                              'machineWidthMeters': drawingWidthMeters,
+                              'machineHeightMeters': drawingHeightMeters,
+                            },
                           );
                         },
                         icon: const Icon(Icons.grid_view_rounded),
