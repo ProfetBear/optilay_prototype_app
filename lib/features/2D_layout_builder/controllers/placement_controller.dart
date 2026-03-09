@@ -1,19 +1,25 @@
-// application/controllers/placement_controller.dart
-import 'package:get/get.dart';
+// lib/features/2D_layout_builder/controllers/placement_controller.dart
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/models/machinery_item.dart';
+
 import 'layout_controller.dart';
 
 class PlacementController extends GetxController {
-  final LayoutController layout;
   PlacementController(this.layout);
 
+  final LayoutController layout;
   final staging = Rxn<MachineryItem>();
 
-  void startAdd({required String assetPath, required double sizeMeters}) {
+  void startAdd({
+    required String assetPath,
+    required double widthMeters,
+    required double heightMeters,
+  }) {
     staging.value = MachineryItem(
       assetPath: assetPath,
-      realWorldSizeMeters: sizeMeters,
+      realWorldWidthMeters: widthMeters,
+      realWorldHeightMeters: heightMeters,
       topLeftScene: Offset.zero,
     );
   }
@@ -24,8 +30,10 @@ class PlacementController extends GetxController {
     final staged = staging.value;
     if (staged == null) return;
 
-    final px = layout.pixelSizeFor(staged.realWorldSizeMeters);
-    final topLeft = scenePoint - Offset(px / 2, px / 1.1);
+    final widthPx = layout.pixelSizeFor(staged.realWorldWidthMeters);
+    final heightPx = layout.pixelSizeFor(staged.realWorldHeightMeters);
+
+    final topLeft = scenePoint - Offset(widthPx / 2, heightPx / 2);
 
     layout.items.add(
       staged.copyWith(

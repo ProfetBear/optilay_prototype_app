@@ -1,19 +1,21 @@
-// presentation/widgets/canvas/placement_hud.dart
+// lib/features/2D_layout_builder/widgets/canvas/placement_hud.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/controllers/placement_controller.dart';
 
 class PlacementHud extends StatelessWidget {
-  final PlacementController pc;
-  final TransformationController viewerController;
-  final double Function(double meters) pixelsFor;
-
   const PlacementHud({
     super.key,
     required this.pc,
     required this.viewerController,
-    required this.pixelsFor,
+    required this.widthPixelsFor,
+    required this.heightPixelsFor,
   });
+
+  final PlacementController pc;
+  final TransformationController viewerController;
+  final double Function(double meters) widthPixelsFor;
+  final double Function(double meters) heightPixelsFor;
 
   @override
   Widget build(BuildContext context) {
@@ -23,19 +25,22 @@ class PlacementHud extends StatelessWidget {
         final staged = pc.staging.value;
         if (staged == null) return const SizedBox.shrink();
 
-        final scenePx = pixelsFor(staged.realWorldSizeMeters);
+        final sceneWidth = widthPixelsFor(staged.realWorldWidthMeters);
+        final sceneHeight = heightPixelsFor(staged.realWorldHeightMeters);
         final zoom = viewerController.value.getMaxScaleOnAxis();
-        final screenPx = scenePx * zoom;
 
         return Positioned.fill(
           child: IgnorePointer(
             child: Center(
               child: SizedBox(
-                width: screenPx,
-                height: screenPx,
+                width: sceneWidth * zoom,
+                height: sceneHeight * zoom,
                 child: Opacity(
                   opacity: 0.95,
-                  child: SvgPicture.asset(staged.assetPath),
+                  child: SvgPicture.asset(
+                    staged.assetPath,
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
             ),

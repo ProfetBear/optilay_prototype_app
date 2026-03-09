@@ -1,12 +1,20 @@
 // lib/features/product/product_page.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:optilay_prototype_app/features/2D_layout_builder/widgets/technical_drawing_embed.dart';
 import 'package:optilay_prototype_app/features/3D_model_viewer/3D_model_viewer_embed.dart';
 import 'package:optilay_prototype_app/routes/routes.dart';
 import 'package:optilay_prototype_app/utils/constants/colors.dart';
 
-class ProductPage extends StatelessWidget {
+class ProductPage extends StatefulWidget {
   const ProductPage({super.key});
+
+  @override
+  State<ProductPage> createState() => _ProductPageState();
+}
+
+class _ProductPageState extends State<ProductPage> {
+  bool _show2D = false;
 
   @override
   Widget build(BuildContext context) {
@@ -14,6 +22,11 @@ class ProductPage extends StatelessWidget {
     final String productName = (args['productName'] as String?) ?? 'Product';
     final String assetPath =
         (args['assetPath'] as String?) ?? 'assets/model.glb';
+
+    // Optional 2D technical drawing asset.
+    // Pass this from selector/product catalog when available.
+    final String drawingAssetPath =
+        (args['drawingAssetPath'] as String?) ?? 'assets/crane.svg';
 
     return Scaffold(
       appBar: AppBar(
@@ -24,28 +37,61 @@ class ProductPage extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            // Top 3D viewer (with fullscreen)
+            // Top viewer with 2D / 3D switch
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
               child: AspectRatio(
                 aspectRatio: 16 / 9,
-                child: ModelViewerEmbed(
-                  assetPath: assetPath,
-                  showFullscreenButton: true,
-                  onFullscreenTap: () {
-                    Get.toNamed(
-                      MyRoutes.modelViewer3D,
-                      arguments: {
-                        'productName': productName,
-                        'assetPath': assetPath,
-                      },
-                    );
-                  },
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child:
+                          _show2D
+                              ? TechnicalDrawingEmbed(
+                                assetPath: drawingAssetPath,
+                                showFullscreenButton: true,
+                                onFullscreenTap: () {
+                                  Get.toNamed(
+                                    MyRoutes.layoutViewer2D,
+                                    arguments: {
+                                      'title':
+                                          '$productName - Technical Drawing',
+                                      'assetPath': drawingAssetPath,
+                                      'productName': productName,
+                                    },
+                                  );
+                                },
+                              )
+                              : ModelViewerEmbed(
+                                assetPath: assetPath,
+                                showFullscreenButton: true,
+                                onFullscreenTap: () {
+                                  Get.toNamed(
+                                    MyRoutes.modelViewer3D,
+                                    arguments: {
+                                      'productName': productName,
+                                      'assetPath': assetPath,
+                                    },
+                                  );
+                                },
+                              ),
+                    ),
+                    Positioned(
+                      left: 12,
+                      top: 12,
+                      child: _ViewerModeSwitch(
+                        show2D: _show2D,
+                        onChanged: (value) {
+                          setState(() => _show2D = value);
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
 
-            // Tech details (brief section)
+            // Tech details
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -118,10 +164,11 @@ class ProductPage extends StatelessWidget {
                       child: ElevatedButton.icon(
                         onPressed: () {
                           Get.toNamed(
-                            MyRoutes.layoutViewer2D,
+                            MyRoutes.layoutEditor2D,
                             arguments: {
                               'productName': productName,
-                              'assetPath': assetPath,
+                              'machineDrawingAssetPath': drawingAssetPath,
+                              'autoImportPdf': true,
                             },
                           );
                         },
@@ -142,6 +189,85 @@ class ProductPage extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ViewerModeSwitch extends StatelessWidget {
+  const _ViewerModeSwitch({required this.show2D, required this.onChanged});
+
+  final bool show2D;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.95),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFEAEAEA)),
+        boxShadow: [
+          BoxShadow(
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.08),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _ModeChip(
+            label: '3D',
+            selected: !show2D,
+            onTap: () => onChanged(false),
+          ),
+          const SizedBox(width: 4),
+          _ModeChip(
+            label: '2D',
+            selected: show2D,
+            onTap: () => onChanged(true),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ModeChip extends StatelessWidget {
+  const _ModeChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: 48,
+        height: 30,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? MyColors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : Colors.black87,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );
