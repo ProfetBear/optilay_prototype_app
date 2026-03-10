@@ -375,17 +375,12 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
                   quotePosition: _quotePosition,
                   quoteLengthPx: _quoteLengthPx,
                   quoteLabel: _quoteLabel,
-                  quoteAngleRad: _quoteAngleRad,
                   showMachine: false,
                   machineAssetPath: _machineDrawingAssetPath,
                   machineTopLeft: _machineTopLeft,
                   machineWidthPx: _machineWidthPx,
                   machineHeightPx: _machineHeightPx,
                   machineRotationRad: _machineRotationRad,
-                  isFullscreen: _boardFullscreen,
-                  onToggleFullscreen: () {
-                    setState(() => _boardFullscreen = !_boardFullscreen);
-                  },
                 ),
               ),
             ],
@@ -432,20 +427,31 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
                   quotePosition: _quotePosition,
                   quoteLengthPx: _quoteLengthPx,
                   quoteLabel: _quoteLabel,
-                  quoteAngleRad: _quoteAngleRad,
                   onMoveQuote: _moveQuote,
-                  onDragLeftHandle: _dragLeftQuoteHandle,
-                  onDragRightHandle: _dragRightQuoteHandle,
+                  onDragLeftHandle: (dx) {
+                    setState(() {
+                      final newLength = _quoteLengthPx - dx;
+                      if (newLength < 80) return;
+
+                      _quoteLengthPx = newLength;
+                      _quotePosition += Offset(dx, 0);
+                    });
+                  },
+
+                  onDragRightHandle: (dx) {
+                    setState(() {
+                      final newLength = _quoteLengthPx + dx;
+                      if (newLength < 80) return;
+
+                      _quoteLengthPx = newLength;
+                    });
+                  },
                   showMachine: false,
                   machineAssetPath: _machineDrawingAssetPath,
                   machineTopLeft: _machineTopLeft,
                   machineWidthPx: _machineWidthPx,
                   machineHeightPx: _machineHeightPx,
                   machineRotationRad: _machineRotationRad,
-                  isFullscreen: _boardFullscreen,
-                  onToggleFullscreen: () {
-                    setState(() => _boardFullscreen = !_boardFullscreen);
-                  },
                 ),
               ),
             ],
@@ -496,7 +502,6 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
                   quotePosition: _quotePosition,
                   quoteLengthPx: _quoteLengthPx,
                   quoteLabel: _quoteLabel,
-                  quoteAngleRad: _quoteAngleRad,
                   showMachine: true,
                   machineAssetPath: _machineDrawingAssetPath,
                   machineTopLeft: _machineTopLeft,
@@ -504,10 +509,6 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
                   machineHeightPx: _machineHeightPx,
                   machineRotationRad: _machineRotationRad,
                   onMoveMachine: _moveMachine,
-                  isFullscreen: _boardFullscreen,
-                  onToggleFullscreen: () {
-                    setState(() => _boardFullscreen = !_boardFullscreen);
-                  },
                 ),
               ),
             ],
@@ -539,17 +540,12 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
                     quotePosition: _quotePosition,
                     quoteLengthPx: _quoteLengthPx,
                     quoteLabel: _quoteLabel,
-                    quoteAngleRad: _quoteAngleRad,
                     showMachine: true,
                     machineAssetPath: _machineDrawingAssetPath,
                     machineTopLeft: _machineTopLeft,
                     machineWidthPx: _machineWidthPx,
                     machineHeightPx: _machineHeightPx,
                     machineRotationRad: _machineRotationRad,
-                    isFullscreen: _boardFullscreen,
-                    onToggleFullscreen: () {
-                      setState(() => _boardFullscreen = !_boardFullscreen);
-                    },
                   ),
                 ),
               ),
@@ -799,15 +795,12 @@ class _PdfStageBoard extends StatelessWidget {
     required this.quotePosition,
     required this.quoteLengthPx,
     required this.quoteLabel,
-    required this.quoteAngleRad,
     required this.showMachine,
     required this.machineAssetPath,
     required this.machineTopLeft,
     required this.machineWidthPx,
     required this.machineHeightPx,
     required this.machineRotationRad,
-    required this.isFullscreen,
-    required this.onToggleFullscreen,
     this.onMoveQuote,
     this.onDragLeftHandle,
     this.onDragRightHandle,
@@ -821,10 +814,10 @@ class _PdfStageBoard extends StatelessWidget {
   final Offset quotePosition;
   final double quoteLengthPx;
   final String quoteLabel;
-  final double quoteAngleRad;
+
   final ValueChanged<Offset>? onMoveQuote;
-  final ValueChanged<Offset>? onDragLeftHandle;
-  final ValueChanged<Offset>? onDragRightHandle;
+  final ValueChanged<double>? onDragLeftHandle;
+  final ValueChanged<double>? onDragRightHandle;
 
   final bool showMachine;
   final String machineAssetPath;
@@ -832,10 +825,8 @@ class _PdfStageBoard extends StatelessWidget {
   final double machineWidthPx;
   final double machineHeightPx;
   final double machineRotationRad;
-  final ValueChanged<Offset>? onMoveMachine;
 
-  final bool isFullscreen;
-  final VoidCallback onToggleFullscreen;
+  final ValueChanged<Offset>? onMoveMachine;
 
   @override
   Widget build(BuildContext context) {
@@ -858,126 +849,99 @@ class _PdfStageBoard extends StatelessWidget {
         border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: InteractiveViewer(
-              minScale: 0.4,
-              maxScale: 6.0,
-              boundaryMargin: const EdgeInsets.all(500),
-              child: SizedBox(
-                width: pdfSize!.width,
-                height: pdfSize!.height,
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: Image.memory(pdfBytes!, fit: BoxFit.fill),
-                    ),
-                    if (showQuote)
-                      Positioned(
-                        left: quotePosition.dx,
-                        top: quotePosition.dy,
-                        child: GestureDetector(
-                          onPanUpdate:
-                              onMoveQuote == null
-                                  ? null
-                                  : (details) => onMoveQuote!(details.delta),
-                          child: Transform.rotate(
-                            angle: quoteAngleRad,
-                            alignment: Alignment.centerLeft,
-                            child: Stack(
-                              alignment: Alignment.centerLeft,
-                              children: [
-                                SizedBox(width: quoteLengthPx, height: 30),
-                                CustomPaint(
-                                  painter: QuotePainter(
-                                    quoteLengthPx,
-                                    label: quoteLabel,
-                                  ),
-                                  child: SizedBox(
-                                    width: quoteLengthPx,
-                                    height: 30,
-                                  ),
-                                ),
-                                if (onDragLeftHandle != null)
-                                  Positioned(
-                                    left: -10,
-                                    child: GestureDetector(
-                                      onPanUpdate:
-                                          (d) => onDragLeftHandle!(d.delta),
-                                      behavior: HitTestBehavior.translucent,
-                                      child: const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                      ),
-                                    ),
-                                  ),
-                                if (onDragRightHandle != null)
-                                  Positioned(
-                                    right: -10,
-                                    child: GestureDetector(
-                                      onPanUpdate:
-                                          (d) => onDragRightHandle!(d.delta),
-                                      behavior: HitTestBehavior.translucent,
-                                      child: const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                      ),
-                                    ),
-                                  ),
-                              ],
+      child: InteractiveViewer(
+        minScale: 0.4,
+        maxScale: 6.0,
+        boundaryMargin: const EdgeInsets.all(500),
+        child: FittedBox(
+          alignment: Alignment.topLeft,
+          child: SizedBox(
+            width: pdfSize!.width,
+            height: pdfSize!.height,
+            child: Stack(
+              children: [
+                /// PDF BACKGROUND
+                Positioned.fill(
+                  child: Image.memory(pdfBytes!, fit: BoxFit.fill),
+                ),
+
+                /// QUOTE LINE
+                if (showQuote)
+                  Positioned(
+                    left: quotePosition.dx,
+                    top: quotePosition.dy,
+                    child: GestureDetector(
+                      onPanUpdate:
+                          onMoveQuote == null
+                              ? null
+                              : (details) => onMoveQuote!(details.delta),
+                      child: Stack(
+                        alignment: Alignment.centerLeft,
+                        children: [
+                          SizedBox(width: quoteLengthPx, height: 30),
+
+                          CustomPaint(
+                            painter: QuotePainter(
+                              quoteLengthPx,
+                              label: quoteLabel,
                             ),
+                            child: SizedBox(width: quoteLengthPx, height: 30),
                           ),
-                        ),
-                      ),
-                    if (showMachine)
-                      Positioned(
-                        left: machineTopLeft.dx,
-                        top: machineTopLeft.dy,
-                        child: GestureDetector(
-                          onPanUpdate:
-                              onMoveMachine == null
-                                  ? null
-                                  : (details) => onMoveMachine!(details.delta),
-                          child: Transform.rotate(
-                            angle: machineRotationRad,
-                            child: SizedBox(
-                              width: machineWidthPx,
-                              height: machineHeightPx,
-                              child: SvgPicture.asset(
-                                machineAssetPath,
-                                fit: BoxFit.contain,
+
+                          if (onDragLeftHandle != null)
+                            Positioned(
+                              left: -10,
+                              child: GestureDetector(
+                                onPanUpdate:
+                                    (d) => onDragLeftHandle!(d.delta.dx),
+                                behavior: HitTestBehavior.translucent,
+                                child: const SizedBox(width: 20, height: 20),
                               ),
                             ),
+
+                          if (onDragRightHandle != null)
+                            Positioned(
+                              right: -10,
+                              child: GestureDetector(
+                                onPanUpdate:
+                                    (d) => onDragRightHandle!(d.delta.dx),
+                                behavior: HitTestBehavior.translucent,
+                                child: const SizedBox(width: 20, height: 20),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                /// MACHINE OVERLAY
+                if (showMachine)
+                  Positioned(
+                    left: machineTopLeft.dx,
+                    top: machineTopLeft.dy,
+                    child: GestureDetector(
+                      onPanUpdate:
+                          onMoveMachine == null
+                              ? null
+                              : (details) => onMoveMachine!(details.delta),
+                      child: Transform.rotate(
+                        alignment: Alignment.center,
+                        angle: machineRotationRad,
+                        child: SizedBox(
+                          width: machineWidthPx,
+                          height: machineHeightPx,
+                          child: SvgPicture.asset(
+                            machineAssetPath,
+                            fit: BoxFit.contain,
                           ),
                         ),
                       ),
-                  ],
-                ),
-              ),
+                    ),
+                  ),
+              ],
             ),
           ),
-          Positioned(
-            right: 10,
-            top: 10,
-            child: InkWell(
-              onTap: onToggleFullscreen,
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.94),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
-                ),
-                child: Icon(
-                  isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
-                  size: 20,
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
