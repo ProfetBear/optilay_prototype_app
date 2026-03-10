@@ -92,6 +92,13 @@ flutter:
     - assets/XBladeRev1_WithoutHull.glb
     - assets/GeminiRev0.glb
     - assets/GeminiRev0_WithoutHull.glb
+    - assets/standard_layouts/1003VLB_DES62669-1.dwg
+    - assets/standard_layouts/1003VLB_DES62669-1.pdf
+    - assets/standard_layouts/G32LS.dwg
+    - assets/standard_layouts/G32LS.pdf
+    - assets/standard_layouts/XB5.dwg
+    - assets/standard_layouts/XB5.pdf
+
     
   # To add assets to your application, add an assets section, like this:
   # assets:
