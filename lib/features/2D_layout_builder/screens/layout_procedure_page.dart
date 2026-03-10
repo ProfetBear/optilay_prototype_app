@@ -50,6 +50,9 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
   String _quoteLabel = '';
   double? _metersPerPixel;
 
+  // 0 = horizontal, pi/2 = vertical
+  double _quoteAngleRad = 0;
+
   Offset _machineTopLeft = const Offset(240, 240);
   double _machineRotationRad = 0;
 
@@ -95,6 +98,9 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
     return _machineHeightMeters / _metersPerPixel!;
   }
 
+  Offset get _quoteAxisUnit =>
+      Offset(math.cos(_quoteAngleRad), math.sin(_quoteAngleRad));
+
   Future<void> _importPdf() async {
     final file = await _picker.pickPdf();
     if (file == null) return;
@@ -113,10 +119,12 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
       );
       _quotePosition = const Offset(120, 120);
       _quoteLengthPx = (_pdfSize!.width * 0.25).clamp(180.0, 360.0);
+      _quoteAngleRad = 0;
       _machineTopLeft = Offset(
         (_pdfSize!.width - 240) / 2,
         (_pdfSize!.height - 240) / 2,
       );
+      _machineRotationRad = 0;
     });
   }
 
@@ -214,6 +222,25 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
 
     setState(() {
       _completedSteps.add(_currentStep);
+
+      // When leaving quote step and entering placement step,
+      // re-center machine using the calibrated size.
+      if (_currentStep == 2 && _hasPdf && _hasScale && _pdfSize != null) {
+        final centeredX = (_pdfSize!.width - _machineWidthPx) / 2;
+        final centeredY = (_pdfSize!.height - _machineHeightPx) / 2;
+
+        _machineTopLeft = Offset(
+          centeredX.clamp(
+            0.0,
+            math.max(0.0, _pdfSize!.width - _machineWidthPx),
+          ),
+          centeredY.clamp(
+            0.0,
+            math.max(0.0, _pdfSize!.height - _machineHeightPx),
+          ),
+        );
+      }
+
       if (_currentStep < 4) {
         _currentStep += 1;
       }
@@ -236,6 +263,63 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
   }
 
   bool get _stepUsesBoard => _currentStep >= 1 && _currentStep <= 4;
+
+  void _toggleQuoteOrientation() {
+    setState(() {
+      _quoteAngleRad = _quoteAngleRad == 0 ? math.pi / 2 : 0;
+    });
+  }
+
+  void _moveQuote(Offset delta) {
+    setState(() {
+      _quotePosition += delta;
+    });
+  }
+
+  void _dragLeftQuoteHandle(Offset dragDelta) {
+    final projection =
+        dragDelta.dx * _quoteAxisUnit.dx + dragDelta.dy * _quoteAxisUnit.dy;
+    final newLength = _quoteLengthPx - projection;
+    if (newLength < 80) return;
+
+    setState(() {
+      _quoteLengthPx = newLength;
+      _quotePosition += Offset(
+        _quoteAxisUnit.dx * projection,
+        _quoteAxisUnit.dy * projection,
+      );
+    });
+  }
+
+  void _dragRightQuoteHandle(Offset dragDelta) {
+    final projection =
+        dragDelta.dx * _quoteAxisUnit.dx + dragDelta.dy * _quoteAxisUnit.dy;
+    final newLength = _quoteLengthPx + projection;
+    if (newLength < 80) return;
+
+    setState(() {
+      _quoteLengthPx = newLength;
+    });
+  }
+
+  void _moveMachine(Offset delta) {
+    if (_pdfSize == null) return;
+
+    final next = _machineTopLeft + delta;
+
+    setState(() {
+      _machineTopLeft = Offset(
+        next.dx.clamp(
+          -_machineWidthPx * 0.5,
+          _pdfSize!.width - _machineWidthPx * 0.5,
+        ),
+        next.dy.clamp(
+          -_machineHeightPx * 0.5,
+          _pdfSize!.height - _machineHeightPx * 0.5,
+        ),
+      );
+    });
+  }
 
   Widget _buildCurrentStep() {
     switch (_currentStep) {
@@ -291,6 +375,7 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
                   quotePosition: _quotePosition,
                   quoteLengthPx: _quoteLengthPx,
                   quoteLabel: _quoteLabel,
+                  quoteAngleRad: _quoteAngleRad,
                   showMachine: false,
                   machineAssetPath: _machineDrawingAssetPath,
                   machineTopLeft: _machineTopLeft,
@@ -310,7 +395,7 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
         return _StepScaffoldCard(
           title: '3. Set the quote',
           subtitle:
-              'Drag the line and its handles over a known dimension, then set the real-world length.',
+              'Drag the line and its handles over a known dimension, switch orientation when needed, then set the real-world length.',
           child: Column(
             children: [
               Row(
@@ -319,6 +404,16 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
                     onPressed: _hasPdf ? _setQuoteScale : null,
                     icon: const Icon(Icons.straighten),
                     label: const Text('Set quote'),
+                  ),
+                  const SizedBox(width: 12),
+                  FilledButton.tonalIcon(
+                    onPressed: _hasPdf ? _toggleQuoteOrientation : null,
+                    icon: Icon(
+                      _quoteAngleRad == 0 ? Icons.swap_vert : Icons.swap_horiz,
+                    ),
+                    label: Text(
+                      _quoteAngleRad == 0 ? 'Vertical' : 'Horizontal',
+                    ),
                   ),
                   const SizedBox(width: 12),
                   if (_hasScale)
@@ -337,26 +432,10 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
                   quotePosition: _quotePosition,
                   quoteLengthPx: _quoteLengthPx,
                   quoteLabel: _quoteLabel,
-                  onMoveQuote: (delta) {
-                    setState(() {
-                      _quotePosition += delta;
-                    });
-                  },
-                  onDragLeftHandle: (deltaX) {
-                    final newLength = _quoteLengthPx - deltaX;
-                    if (newLength < 80) return;
-                    setState(() {
-                      _quoteLengthPx = newLength;
-                      _quotePosition += Offset(deltaX, 0);
-                    });
-                  },
-                  onDragRightHandle: (deltaX) {
-                    final newLength = _quoteLengthPx + deltaX;
-                    if (newLength < 80) return;
-                    setState(() {
-                      _quoteLengthPx = newLength;
-                    });
-                  },
+                  quoteAngleRad: _quoteAngleRad,
+                  onMoveQuote: _moveQuote,
+                  onDragLeftHandle: _dragLeftQuoteHandle,
+                  onDragRightHandle: _dragRightQuoteHandle,
                   showMachine: false,
                   machineAssetPath: _machineDrawingAssetPath,
                   machineTopLeft: _machineTopLeft,
@@ -417,17 +496,14 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
                   quotePosition: _quotePosition,
                   quoteLengthPx: _quoteLengthPx,
                   quoteLabel: _quoteLabel,
+                  quoteAngleRad: _quoteAngleRad,
                   showMachine: true,
                   machineAssetPath: _machineDrawingAssetPath,
                   machineTopLeft: _machineTopLeft,
                   machineWidthPx: _machineWidthPx,
                   machineHeightPx: _machineHeightPx,
                   machineRotationRad: _machineRotationRad,
-                  onMoveMachine: (delta) {
-                    setState(() {
-                      _machineTopLeft += delta;
-                    });
-                  },
+                  onMoveMachine: _moveMachine,
                   isFullscreen: _boardFullscreen,
                   onToggleFullscreen: () {
                     setState(() => _boardFullscreen = !_boardFullscreen);
@@ -463,6 +539,7 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
                     quotePosition: _quotePosition,
                     quoteLengthPx: _quoteLengthPx,
                     quoteLabel: _quoteLabel,
+                    quoteAngleRad: _quoteAngleRad,
                     showMachine: true,
                     machineAssetPath: _machineDrawingAssetPath,
                     machineTopLeft: _machineTopLeft,
@@ -722,6 +799,7 @@ class _PdfStageBoard extends StatelessWidget {
     required this.quotePosition,
     required this.quoteLengthPx,
     required this.quoteLabel,
+    required this.quoteAngleRad,
     required this.showMachine,
     required this.machineAssetPath,
     required this.machineTopLeft,
@@ -743,9 +821,10 @@ class _PdfStageBoard extends StatelessWidget {
   final Offset quotePosition;
   final double quoteLengthPx;
   final String quoteLabel;
+  final double quoteAngleRad;
   final ValueChanged<Offset>? onMoveQuote;
-  final ValueChanged<double>? onDragLeftHandle;
-  final ValueChanged<double>? onDragRightHandle;
+  final ValueChanged<Offset>? onDragLeftHandle;
+  final ValueChanged<Offset>? onDragRightHandle;
 
   final bool showMachine;
   final String machineAssetPath;
@@ -803,47 +882,51 @@ class _PdfStageBoard extends StatelessWidget {
                               onMoveQuote == null
                                   ? null
                                   : (details) => onMoveQuote!(details.delta),
-                          child: Stack(
+                          child: Transform.rotate(
+                            angle: quoteAngleRad,
                             alignment: Alignment.centerLeft,
-                            children: [
-                              SizedBox(width: quoteLengthPx, height: 30),
-                              CustomPaint(
-                                painter: QuotePainter(
-                                  quoteLengthPx,
-                                  label: quoteLabel,
-                                ),
-                                child: SizedBox(
-                                  width: quoteLengthPx,
-                                  height: 30,
-                                ),
-                              ),
-                              if (onDragLeftHandle != null)
-                                Positioned(
-                                  left: -10,
-                                  child: GestureDetector(
-                                    onPanUpdate:
-                                        (d) => onDragLeftHandle!(d.delta.dx),
-                                    behavior: HitTestBehavior.translucent,
-                                    child: const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                    ),
+                            child: Stack(
+                              alignment: Alignment.centerLeft,
+                              children: [
+                                SizedBox(width: quoteLengthPx, height: 30),
+                                CustomPaint(
+                                  painter: QuotePainter(
+                                    quoteLengthPx,
+                                    label: quoteLabel,
+                                  ),
+                                  child: SizedBox(
+                                    width: quoteLengthPx,
+                                    height: 30,
                                   ),
                                 ),
-                              if (onDragRightHandle != null)
-                                Positioned(
-                                  right: -10,
-                                  child: GestureDetector(
-                                    onPanUpdate:
-                                        (d) => onDragRightHandle!(d.delta.dx),
-                                    behavior: HitTestBehavior.translucent,
-                                    child: const SizedBox(
-                                      width: 20,
-                                      height: 20,
+                                if (onDragLeftHandle != null)
+                                  Positioned(
+                                    left: -10,
+                                    child: GestureDetector(
+                                      onPanUpdate:
+                                          (d) => onDragLeftHandle!(d.delta),
+                                      behavior: HitTestBehavior.translucent,
+                                      child: const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                      ),
                                     ),
                                   ),
-                                ),
-                            ],
+                                if (onDragRightHandle != null)
+                                  Positioned(
+                                    right: -10,
+                                    child: GestureDetector(
+                                      onPanUpdate:
+                                          (d) => onDragRightHandle!(d.delta),
+                                      behavior: HitTestBehavior.translucent,
+                                      child: const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
