@@ -1,4 +1,4 @@
-package com.example.optilay_prototype_app
+package com.matteomaggi.optilay_prototype_app
 
 import io.flutter.embedding.android.FlutterActivity
 

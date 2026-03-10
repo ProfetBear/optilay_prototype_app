@@ -37,12 +37,12 @@ dependencies:
   lottie: ^3.3.1
 
   # Connection status  
-  connectivity_plus: ^6.1.4 
+  connectivity_plus: ^7.0.0 
 
   # Viewer 3D
   url_launcher: ^6.3.0
   model_viewer_plus: ^1.9.3
-  shelf: ^1.4.1  # ✅ add this
+  shelf: ^1.4.1
 
   arkit_plugin: ^1.2.1
   vector_math: ^2.2.0
