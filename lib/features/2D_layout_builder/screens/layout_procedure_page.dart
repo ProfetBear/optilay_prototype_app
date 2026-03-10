@@ -58,6 +58,8 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
 
   bool _boardFullscreen = false;
 
+  Size? _machineSvgSize;
+
   String get _productName {
     final args = (Get.arguments as Map?) ?? {};
     return widget.productName ?? (args['productName'] as String?) ?? 'Product';
@@ -101,6 +103,33 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
   Offset get _quoteAxisUnit =>
       Offset(math.cos(_quoteAngleRad), math.sin(_quoteAngleRad));
 
+  double get _machineSvgScale {
+    if (_machineSvgSize == null || _metersPerPixel == null) return 1;
+
+    final realWidthPx = _machineWidthMeters * 5 / _metersPerPixel!;
+    final svgWidth = _machineSvgSize!.width;
+
+    return realWidthPx / svgWidth;
+  }
+
+  Future<Size?> _getSvgViewBoxSize(String assetPath) async {
+    final rawSvg = await DefaultAssetBundle.of(context).loadString(assetPath);
+
+    final viewBoxRegex = RegExp(r'viewBox="([\d.\s]+)"');
+    final match = viewBoxRegex.firstMatch(rawSvg);
+
+    if (match == null) return null;
+
+    final values = match.group(1)!.split(RegExp(r'\s+'));
+
+    if (values.length != 4) return null;
+
+    final width = double.parse(values[2]);
+    final height = double.parse(values[3]);
+
+    return Size(width, height);
+  }
+
   Future<void> _importPdf() async {
     final file = await _picker.pickPdf();
     if (file == null) return;
@@ -110,6 +139,8 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
 
     final codec = await ui.instantiateImageCodec(bytes);
     final frame = await codec.getNextFrame();
+
+    final svgSize = await _getSvgViewBoxSize(_machineDrawingAssetPath);
 
     setState(() {
       _pdfBytes = bytes;
@@ -125,6 +156,8 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
         (_pdfSize!.height - 240) / 2,
       );
       _machineRotationRad = 0;
+
+      _machineSvgSize = svgSize;
     });
   }
 
@@ -381,6 +414,7 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
                   machineWidthPx: _machineWidthPx,
                   machineHeightPx: _machineHeightPx,
                   machineRotationRad: _machineRotationRad,
+                  machineScale: _machineSvgScale,
                 ),
               ),
             ],
@@ -452,6 +486,7 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
                   machineWidthPx: _machineWidthPx,
                   machineHeightPx: _machineHeightPx,
                   machineRotationRad: _machineRotationRad,
+                  machineScale: _machineSvgScale,
                 ),
               ),
             ],
@@ -509,6 +544,7 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
                   machineHeightPx: _machineHeightPx,
                   machineRotationRad: _machineRotationRad,
                   onMoveMachine: _moveMachine,
+                  machineScale: _machineSvgScale,
                 ),
               ),
             ],
@@ -546,6 +582,7 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
                     machineWidthPx: _machineWidthPx,
                     machineHeightPx: _machineHeightPx,
                     machineRotationRad: _machineRotationRad,
+                    machineScale: _machineSvgScale,
                   ),
                 ),
               ),
@@ -642,6 +679,10 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
     );
   }
 }
+
+// ------------------------------
+// Remaining widgets: _ProcedureChecklist, _StepScaffoldCard
+// ------------------------------
 
 class _ProcedureChecklist extends StatelessWidget {
   const _ProcedureChecklist({
@@ -787,6 +828,10 @@ class _StepScaffoldCard extends StatelessWidget {
   }
 }
 
+// ------------------------------
+// _PdfStageBoard
+// ------------------------------
+
 class _PdfStageBoard extends StatelessWidget {
   const _PdfStageBoard({
     required this.pdfBytes,
@@ -805,6 +850,7 @@ class _PdfStageBoard extends StatelessWidget {
     this.onDragLeftHandle,
     this.onDragRightHandle,
     this.onMoveMachine,
+    this.machineScale = 1,
   });
 
   final Uint8List? pdfBytes;
@@ -825,6 +871,7 @@ class _PdfStageBoard extends StatelessWidget {
   final double machineWidthPx;
   final double machineHeightPx;
   final double machineRotationRad;
+  final double machineScale;
 
   final ValueChanged<Offset>? onMoveMachine;
 
@@ -930,9 +977,13 @@ class _PdfStageBoard extends StatelessWidget {
                         child: SizedBox(
                           width: machineWidthPx,
                           height: machineHeightPx,
-                          child: SvgPicture.asset(
-                            machineAssetPath,
-                            fit: BoxFit.contain,
+                          child: Transform.scale(
+                            scale: machineScale,
+                            alignment: Alignment.topLeft,
+                            child: SvgPicture.asset(
+                              machineAssetPath,
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
                       ),

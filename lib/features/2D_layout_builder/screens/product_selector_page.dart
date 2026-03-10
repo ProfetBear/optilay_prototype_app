@@ -51,6 +51,9 @@ class ModelSelectorPage extends StatelessWidget {
                   arguments: {
                     'productName': 'XBlade',
                     'assetPath': 'assets/XBladeRev1.glb',
+                    'drawingAssetPath': 'assets/layouts/XB5.svg',
+                    'drawingHeightMeters': 21.0,
+                    'drawingWidthMeters': 29.7,
                   },
                 );
               },
@@ -67,6 +70,9 @@ class ModelSelectorPage extends StatelessWidget {
                   arguments: {
                     'productName': 'Gemini',
                     'assetPath': 'assets/GeminiRev0.glb',
+                    'drawingAssetPath': 'assets/layouts/G32LS.svg',
+                    'drawingHeightMeters': 21.0,
+                    'drawingWidthMeters': 29.7,
                   },
                 );
               },
