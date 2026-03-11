@@ -3,9 +3,9 @@ import 'package:optilay_prototype_app/features/2D_layout_builder/screens/layout_
 import 'package:optilay_prototype_app/features/2D_layout_builder/screens/layout_procedure_page.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/screens/layout_viewer_page.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/screens/new_canva_page.dart';
-import 'package:optilay_prototype_app/features/2D_layout_builder/screens/product_page.dart';
+import 'package:optilay_prototype_app/features/Catalog/screens/product_page.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/screens/project_selector_page.dart';
-import 'package:optilay_prototype_app/features/2D_layout_builder/screens/product_selector_page.dart';
+import 'package:optilay_prototype_app/features/Catalog/screens/product_selector_page.dart';
 import 'package:optilay_prototype_app/features/3D_model_viewer/3D_model_viewer.dart';
 import 'package:optilay_prototype_app/features/AR_model_viewer/ar_model_selector.dart';
 import 'package:optilay_prototype_app/features/AR_model_viewer/ar_model_viewer.dart';
