@@ -1,8 +1,7 @@
 import 'package:get/get.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/screens/layout_procedure_page.dart';
-import 'package:optilay_prototype_app/features/2D_layout_builder/screens/layout_viewer_page.dart';
+import 'package:optilay_prototype_app/features/2D_model_viewer/layout_viewer_page.dart';
 import 'package:optilay_prototype_app/features/Catalog/screens/product_page.dart';
-import 'package:optilay_prototype_app/features/2D_layout_builder/screens/project_selector_page.dart';
 import 'package:optilay_prototype_app/features/Catalog/screens/product_selector_page.dart';
 import 'package:optilay_prototype_app/features/3D_model_viewer/3D_model_viewer.dart';
 import 'package:optilay_prototype_app/features/AR_model_viewer/ar_model_selector.dart';
@@ -43,12 +42,6 @@ class AppRoutes {
       transitionDuration: Duration(milliseconds: 50),
     ),
     // -- Layout Builder Feature
-    GetPage(
-      name: MyRoutes.layoutProjectSelector,
-      page: () => ProjectSelectorPage(),
-      transition: Transition.fadeIn,
-      transitionDuration: Duration(milliseconds: 50),
-    ),
     GetPage(
       name: MyRoutes.layoutViewer2D,
       page: () => LayoutViewerPage(),
