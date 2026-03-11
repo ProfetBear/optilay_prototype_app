@@ -1,5 +1,4 @@
 import 'package:get/get.dart';
-import 'package:optilay_prototype_app/features/2D_layout_builder/screens/layout_editor_page.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/screens/layout_procedure_page.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/screens/layout_viewer_page.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/screens/new_canva_page.dart';
@@ -60,13 +59,6 @@ class AppRoutes {
     GetPage(
       name: MyRoutes.layoutProcedure,
       page: () => const LayoutProcedurePage(),
-    ),
-    // todo
-    GetPage(
-      name: MyRoutes.layoutEditor2D,
-      page: () => LayoutEditorPage(),
-      transition: Transition.fadeIn,
-      transitionDuration: Duration(milliseconds: 50),
     ),
     GetPage(
       name: MyRoutes.newCanva,
