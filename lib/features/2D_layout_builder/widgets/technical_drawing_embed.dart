@@ -52,7 +52,7 @@ class TechnicalDrawingEmbed extends StatelessWidget {
           if (showFullscreenButton && onFullscreenTap != null)
             Positioned(
               right: 8,
-              top: 8,
+              bottom: 8,
               child: InkWell(
                 onTap: onFullscreenTap,
                 borderRadius: BorderRadius.circular(12),

@@ -33,16 +33,7 @@ class _LayoutViewerPageState extends State<LayoutViewerPage> {
     final height = (args?['height'] as double?) ?? 500.0;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-        actions: [
-          IconButton(
-            tooltip: 'Reset view',
-            icon: const Icon(Icons.center_focus_strong),
-            onPressed: _resetView,
-          ),
-        ],
-      ),
+      appBar: AppBar(title: Text(title)),
       body: Center(
         child: InteractiveViewer(
           transformationController: _viewerController,
@@ -67,9 +58,9 @@ class _LayoutViewerPageState extends State<LayoutViewerPage> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        label: const Text('Open Editor'),
-        icon: const Icon(Icons.edit),
-        onPressed: () => Get.toNamed('/layout_editor'),
+        label: const Text('Reset view'),
+        icon: const Icon(Icons.center_focus_strong),
+        onPressed: _resetView,
       ),
     );
   }
