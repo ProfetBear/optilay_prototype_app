@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
+import 'package:xml/xml.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/data/pdf_export.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/data/pdf_import.dart';
 import 'package:optilay_prototype_app/features/2D_layout_builder/data/pdf_picker.dart';
@@ -32,63 +33,77 @@ class LayoutProcedurePage extends StatefulWidget {
 }
 
 class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
+  // ─── Services ───────────────────────────────────────────────────────────────
   final FilePickerService _picker = FilePickerService();
   final PdfImportService _pdfImport = PdfImportService();
   final ExportService _export = ExportService();
 
   final GlobalKey _exportKey = GlobalKey();
 
+  // ─── Route-argument resolved values (set once in initState) ─────────────────
+  late final String _productName;
+  late final String _machineDrawingAssetPath;
+  late final double _machineWidthMeters;
+  late final double _machineHeightMeters;
+
+  // ─── Step state ──────────────────────────────────────────────────────────────
   int _currentStep = 0;
   final Set<int> _completedSteps = {};
 
+  static const int _firstBoardStep = 1;
+  static const int _lastBoardStep = 4;
+
+  // ─── PDF / canvas state ──────────────────────────────────────────────────────
   String? _selectedOption;
   Uint8List? _pdfBytes;
   Size? _pdfSize;
 
+  // ─── Quote (calibration line) state ─────────────────────────────────────────
   Offset _quotePosition = const Offset(120, 120);
   double _quoteLengthPx = 240;
   String _quoteLabel = '';
   double? _metersPerPixel;
 
-  // 0 = horizontal, pi/2 = vertical
+  /// 0 = horizontal, pi/2 = vertical
   double _quoteAngleRad = 0;
 
+  // ─── Machine overlay state ───────────────────────────────────────────────────
   Offset _machineTopLeft = const Offset(240, 240);
   double _machineRotationRad = 0;
-
-  bool _boardFullscreen = false;
-
   Size? _machineSvgSize;
 
-  String get _productName {
-    final args = (Get.arguments as Map?) ?? {};
-    return widget.productName ?? (args['productName'] as String?) ?? 'Product';
-  }
+  /// Pixels per meter used as SVG render resolution baseline.
+  static const double _svgRenderDpi = 5.0;
 
-  String get _machineDrawingAssetPath {
+  // ─── Lifecycle ───────────────────────────────────────────────────────────────
+
+  @override
+  void initState() {
+    super.initState();
     final args = (Get.arguments as Map?) ?? {};
-    return widget.machineDrawingAssetPath ??
+    _productName =
+        widget.productName ?? (args['productName'] as String?) ?? 'Product';
+    _machineDrawingAssetPath =
+        widget.machineDrawingAssetPath ??
         (args['machineDrawingAssetPath'] as String?) ??
         'assets/crane.svg';
-  }
-
-  double get _machineWidthMeters {
-    final args = (Get.arguments as Map?) ?? {};
-    return widget.machineWidthMeters ??
+    _machineWidthMeters =
+        widget.machineWidthMeters ??
         (args['machineWidthMeters'] as num?)?.toDouble() ??
         2.0;
-  }
-
-  double get _machineHeightMeters {
-    final args = (Get.arguments as Map?) ?? {};
-    return widget.machineHeightMeters ??
+    _machineHeightMeters =
+        widget.machineHeightMeters ??
         (args['machineHeightMeters'] as num?)?.toDouble() ??
         2.0;
   }
 
+  // ─── Derived getters ─────────────────────────────────────────────────────────
+
   bool get _hasPdf => _pdfBytes != null && _pdfSize != null;
   bool get _hasScale => _metersPerPixel != null;
   bool get _canPlaceMachine => _hasPdf && _hasScale;
+  bool get _stepUsesBoard =>
+      _currentStep >= _firstBoardStep && _currentStep <= _lastBoardStep;
 
   double get _machineWidthPx {
     if (_metersPerPixel == null) return 200;
@@ -105,30 +120,27 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
 
   double get _machineSvgScale {
     if (_machineSvgSize == null || _metersPerPixel == null) return 1;
-
-    final realWidthPx = _machineWidthMeters * 5 / _metersPerPixel!;
-    final svgWidth = _machineSvgSize!.width;
-
-    return realWidthPx / svgWidth;
+    final realWidthPx = _machineWidthMeters * _svgRenderDpi / _metersPerPixel!;
+    return realWidthPx / _machineSvgSize!.width;
   }
+
+  // ─── SVG helpers ─────────────────────────────────────────────────────────────
 
   Future<Size?> _getSvgViewBoxSize(String assetPath) async {
     final rawSvg = await DefaultAssetBundle.of(context).loadString(assetPath);
-
-    final viewBoxRegex = RegExp(r'viewBox="([\d.\s]+)"');
-    final match = viewBoxRegex.firstMatch(rawSvg);
-
-    if (match == null) return null;
-
-    final values = match.group(1)!.split(RegExp(r'\s+'));
-
-    if (values.length != 4) return null;
-
-    final width = double.parse(values[2]);
-    final height = double.parse(values[3]);
-
-    return Size(width, height);
+    try {
+      final doc = XmlDocument.parse(rawSvg);
+      final viewBox = doc.rootElement.getAttribute('viewBox');
+      if (viewBox == null) return null;
+      final parts = viewBox.trim().split(RegExp(r'\s+'));
+      if (parts.length != 4) return null;
+      return Size(double.parse(parts[2]), double.parse(parts[3]));
+    } catch (_) {
+      return null;
+    }
   }
+
+  // ─── PDF import ──────────────────────────────────────────────────────────────
 
   Future<void> _importPdf() async {
     final file = await _picker.pickPdf();
@@ -139,9 +151,9 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
 
     final codec = await ui.instantiateImageCodec(bytes);
     final frame = await codec.getNextFrame();
-
     final svgSize = await _getSvgViewBoxSize(_machineDrawingAssetPath);
 
+    if (!mounted) return;
     setState(() {
       _pdfBytes = bytes;
       _pdfSize = Size(
@@ -156,16 +168,17 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
         (_pdfSize!.height - 240) / 2,
       );
       _machineRotationRad = 0;
-
       _machineSvgSize = svgSize;
     });
   }
+
+  // ─── Quote scale dialog ──────────────────────────────────────────────────────
 
   Future<void> _setQuoteScale() async {
     final formKey = GlobalKey<FormState>();
     String inputValue = '';
 
-    await Get.dialog(
+    final result = await Get.dialog<double>(
       AlertDialog(
         title: const Text('Real-world Length'),
         content: Form(
@@ -195,36 +208,48 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
           ),
         ],
       ),
-    ).then((result) {
-      final double? realLength = result is num ? result.toDouble() : null;
-      if (realLength == null) return;
+    );
 
-      if (!mounted) return;
-      setState(() {
-        _metersPerPixel = realLength / _quoteLengthPx;
-        _quoteLabel = '${realLength.toStringAsFixed(2)} m';
-      });
+    final double? realLength = result is num ? result?.toDouble() : null;
+    if (realLength == null || !mounted) return;
+
+    setState(() {
+      _metersPerPixel = realLength / _quoteLengthPx;
+      _quoteLabel = '${realLength.toStringAsFixed(2)} m';
     });
   }
+
+  // ─── Export ──────────────────────────────────────────────────────────────────
 
   Future<void> _exportProcedurePdf() async {
     final boundary =
         _exportKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
     if (boundary == null) return;
 
-    if (boundary.debugNeedsPaint) {
-      await Future.delayed(const Duration(milliseconds: 30));
+    try {
+      if (boundary.debugNeedsPaint) {
+        await Future.delayed(const Duration(milliseconds: 30));
+      }
+
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) return;
+
+      await _export.exportPngToPdfAndShareHQ(
+        byteData.buffer.asUint8List(),
+        filename: 'layout_procedure_export.pdf',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Get.snackbar(
+        'Export failed',
+        'Could not export the PDF. Please try again.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     }
-
-    final image = await boundary.toImage(pixelRatio: 3.0);
-    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-    if (byteData == null) return;
-
-    await _export.exportPngToPdfAndShareHQ(
-      byteData.buffer.asUint8List(),
-      filename: 'layout_procedure_export.pdf',
-    );
   }
+
+  // ─── Step validation ─────────────────────────────────────────────────────────
 
   bool _isStepReady(int step) {
     switch (step) {
@@ -243,43 +268,6 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
     }
   }
 
-  void _saveCurrentStep() {
-    if (!_isStepReady(_currentStep)) {
-      Get.snackbar(
-        'Step incomplete',
-        _stepValidationMessage(_currentStep),
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      return;
-    }
-
-    setState(() {
-      _completedSteps.add(_currentStep);
-
-      // When leaving quote step and entering placement step,
-      // re-center machine using the calibrated size.
-      if (_currentStep == 2 && _hasPdf && _hasScale && _pdfSize != null) {
-        final centeredX = (_pdfSize!.width - _machineWidthPx) / 2;
-        final centeredY = (_pdfSize!.height - _machineHeightPx) / 2;
-
-        _machineTopLeft = Offset(
-          centeredX.clamp(
-            0.0,
-            math.max(0.0, _pdfSize!.width - _machineWidthPx),
-          ),
-          centeredY.clamp(
-            0.0,
-            math.max(0.0, _pdfSize!.height - _machineHeightPx),
-          ),
-        );
-      }
-
-      if (_currentStep < 4) {
-        _currentStep += 1;
-      }
-    });
-  }
-
   String _stepValidationMessage(int step) {
     switch (step) {
       case 0:
@@ -295,7 +283,40 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
     }
   }
 
-  bool get _stepUsesBoard => _currentStep >= 1 && _currentStep <= 4;
+  void _saveCurrentStep() {
+    if (!_isStepReady(_currentStep)) {
+      Get.snackbar(
+        'Step incomplete',
+        _stepValidationMessage(_currentStep),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    setState(() {
+      _completedSteps.add(_currentStep);
+
+      // When leaving quote step, re-center machine using the calibrated size.
+      if (_currentStep == 2 && _hasPdf && _hasScale && _pdfSize != null) {
+        final centeredX = (_pdfSize!.width - _machineWidthPx) / 2;
+        final centeredY = (_pdfSize!.height - _machineHeightPx) / 2;
+        _machineTopLeft = Offset(
+          centeredX.clamp(
+            0.0,
+            math.max(0.0, _pdfSize!.width - _machineWidthPx),
+          ),
+          centeredY.clamp(
+            0.0,
+            math.max(0.0, _pdfSize!.height - _machineHeightPx),
+          ),
+        );
+      }
+
+      if (_currentStep < 4) _currentStep += 1;
+    });
+  }
+
+  // ─── Quote interaction ───────────────────────────────────────────────────────
 
   void _toggleQuoteOrientation() {
     setState(() {
@@ -304,9 +325,7 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
   }
 
   void _moveQuote(Offset delta) {
-    setState(() {
-      _quotePosition += delta;
-    });
+    setState(() => _quotePosition += delta);
   }
 
   void _dragLeftQuoteHandle(Offset dragDelta) {
@@ -314,7 +333,6 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
         dragDelta.dx * _quoteAxisUnit.dx + dragDelta.dy * _quoteAxisUnit.dy;
     final newLength = _quoteLengthPx - projection;
     if (newLength < 80) return;
-
     setState(() {
       _quoteLengthPx = newLength;
       _quotePosition += Offset(
@@ -329,17 +347,14 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
         dragDelta.dx * _quoteAxisUnit.dx + dragDelta.dy * _quoteAxisUnit.dy;
     final newLength = _quoteLengthPx + projection;
     if (newLength < 80) return;
-
-    setState(() {
-      _quoteLengthPx = newLength;
-    });
+    setState(() => _quoteLengthPx = newLength);
   }
+
+  // ─── Machine interaction ─────────────────────────────────────────────────────
 
   void _moveMachine(Offset delta) {
     if (_pdfSize == null) return;
-
     final next = _machineTopLeft + delta;
-
     setState(() {
       _machineTopLeft = Offset(
         next.dx.clamp(
@@ -354,255 +369,224 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
     });
   }
 
+  // ─── Step builders ───────────────────────────────────────────────────────────
+
   Widget _buildCurrentStep() {
-    switch (_currentStep) {
-      case 0:
-        return _StepScaffoldCard(
-          title: '1. Configure your machine',
-          subtitle:
-              'Temporary placeholder step. Select one option to continue the procedure.',
-          child: Column(
-            children: [
-              RadioListTile<String>(
-                value: 'Option 1',
-                groupValue: _selectedOption,
-                title: const Text('Option 1'),
-                subtitle: const Text('Placeholder machine configuration'),
-                onChanged: (value) {
-                  setState(() => _selectedOption = value);
-                },
-              ),
-              RadioListTile<String>(
-                value: 'Option 2',
-                groupValue: _selectedOption,
-                title: const Text('Option 2'),
-                subtitle: const Text('Alternative placeholder configuration'),
-                onChanged: (value) {
-                  setState(() => _selectedOption = value);
-                },
-              ),
-            ],
-          ),
-        );
-      case 1:
-        return _StepScaffoldCard(
-          title: '2. Import the customer PDF',
-          subtitle:
-              'Load the customer planimetry. Once imported, save to continue.',
-          child: Column(
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: FilledButton.icon(
-                  onPressed: _importPdf,
-                  icon: const Icon(Icons.picture_as_pdf),
-                  label: Text(_hasPdf ? 'Replace PDF' : 'Import PDF'),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: _PdfStageBoard(
-                  pdfBytes: _pdfBytes,
-                  pdfSize: _pdfSize,
-                  showQuote: false,
-                  quotePosition: _quotePosition,
-                  quoteLengthPx: _quoteLengthPx,
-                  quoteLabel: _quoteLabel,
-                  showMachine: false,
-                  machineAssetPath: _machineDrawingAssetPath,
-                  machineTopLeft: _machineTopLeft,
-                  machineWidthPx: _machineWidthPx,
-                  machineHeightPx: _machineHeightPx,
-                  machineRotationRad: _machineRotationRad,
-                  machineScale: _machineSvgScale,
-                ),
-              ),
-            ],
-          ),
-        );
-      case 2:
-        return _StepScaffoldCard(
-          title: '3. Set the quote',
-          subtitle:
-              'Drag the line and its handles over a known dimension, switch orientation when needed, then set the real-world length.',
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  FilledButton.icon(
-                    onPressed: _hasPdf ? _setQuoteScale : null,
-                    icon: const Icon(Icons.straighten),
-                    label: const Text('Set quote'),
-                  ),
-                  const SizedBox(width: 12),
-                  FilledButton.tonalIcon(
-                    onPressed: _hasPdf ? _toggleQuoteOrientation : null,
-                    icon: Icon(
-                      _quoteAngleRad == 0 ? Icons.swap_vert : Icons.swap_horiz,
-                    ),
-                    label: Text(
-                      _quoteAngleRad == 0 ? 'Vertical' : 'Horizontal',
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  if (_hasScale)
-                    Chip(
-                      label: Text(_quoteLabel),
-                      backgroundColor: Colors.green.shade50,
-                    ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: _PdfStageBoard(
-                  pdfBytes: _pdfBytes,
-                  pdfSize: _pdfSize,
-                  showQuote: true,
-                  quotePosition: _quotePosition,
-                  quoteLengthPx: _quoteLengthPx,
-                  quoteLabel: _quoteLabel,
-                  onMoveQuote: _moveQuote,
-                  onDragLeftHandle: (dx) {
-                    setState(() {
-                      final newLength = _quoteLengthPx - dx;
-                      if (newLength < 80) return;
-
-                      _quoteLengthPx = newLength;
-                      _quotePosition += Offset(dx, 0);
-                    });
-                  },
-
-                  onDragRightHandle: (dx) {
-                    setState(() {
-                      final newLength = _quoteLengthPx + dx;
-                      if (newLength < 80) return;
-
-                      _quoteLengthPx = newLength;
-                    });
-                  },
-                  showMachine: false,
-                  machineAssetPath: _machineDrawingAssetPath,
-                  machineTopLeft: _machineTopLeft,
-                  machineWidthPx: _machineWidthPx,
-                  machineHeightPx: _machineHeightPx,
-                  machineRotationRad: _machineRotationRad,
-                  machineScale: _machineSvgScale,
-                ),
-              ),
-            ],
-          ),
-        );
-      case 3:
-        return _StepScaffoldCard(
-          title: '4. Place and rotate the machinery',
-          subtitle:
-              'Move the machine footprint on the calibrated plan and adjust rotation before saving.',
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  FilledButton.tonalIcon(
-                    onPressed:
-                        _canPlaceMachine
-                            ? () {
-                              setState(() {
-                                _machineRotationRad -= math.pi / 12;
-                              });
-                            }
-                            : null,
-                    icon: const Icon(Icons.rotate_left),
-                    label: const Text('Rotate'),
-                  ),
-                  const SizedBox(width: 12),
-                  FilledButton.tonalIcon(
-                    onPressed:
-                        _canPlaceMachine
-                            ? () {
-                              setState(() {
-                                _machineRotationRad += math.pi / 12;
-                              });
-                            }
-                            : null,
-                    icon: const Icon(Icons.rotate_right),
-                    label: const Text('Rotate'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: _PdfStageBoard(
-                  pdfBytes: _pdfBytes,
-                  pdfSize: _pdfSize,
-                  showQuote: true,
-                  quotePosition: _quotePosition,
-                  quoteLengthPx: _quoteLengthPx,
-                  quoteLabel: _quoteLabel,
-                  showMachine: true,
-                  machineAssetPath: _machineDrawingAssetPath,
-                  machineTopLeft: _machineTopLeft,
-                  machineWidthPx: _machineWidthPx,
-                  machineHeightPx: _machineHeightPx,
-                  machineRotationRad: _machineRotationRad,
-                  onMoveMachine: _moveMachine,
-                  machineScale: _machineSvgScale,
-                ),
-              ),
-            ],
-          ),
-        );
-      default:
-        return _StepScaffoldCard(
-          title: '5. Export',
-          subtitle:
-              'Review the final composition and export the layout preview as PDF.',
-          child: Column(
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: FilledButton.icon(
-                  onPressed: _hasPdf ? _exportProcedurePdf : null,
-                  icon: const Icon(Icons.ios_share),
-                  label: const Text('Export PDF'),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: RepaintBoundary(
-                  key: _exportKey,
-                  child: _PdfStageBoard(
-                    pdfBytes: _pdfBytes,
-                    pdfSize: _pdfSize,
-                    showQuote: true,
-                    quotePosition: _quotePosition,
-                    quoteLengthPx: _quoteLengthPx,
-                    quoteLabel: _quoteLabel,
-                    showMachine: true,
-                    machineAssetPath: _machineDrawingAssetPath,
-                    machineTopLeft: _machineTopLeft,
-                    machineWidthPx: _machineWidthPx,
-                    machineHeightPx: _machineHeightPx,
-                    machineRotationRad: _machineRotationRad,
-                    machineScale: _machineSvgScale,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-    }
+    return switch (_currentStep) {
+      0 => _buildStepConfigure(),
+      1 => _buildStepImportPdf(),
+      2 => _buildStepSetQuote(),
+      3 => _buildStepPlaceMachine(),
+      _ => _buildStepExport(),
+    };
   }
+
+  Widget _buildStepConfigure() {
+    return _StepScaffoldCard(
+      title: '1. Configure your machine',
+      subtitle:
+          'Temporary placeholder step. Select one option to continue the procedure.',
+      child: Column(
+        children: [
+          RadioListTile<String>(
+            value: 'Option 1',
+            groupValue: _selectedOption,
+            title: const Text('Option 1'),
+            subtitle: const Text('Placeholder machine configuration'),
+            onChanged: (value) => setState(() => _selectedOption = value),
+          ),
+          RadioListTile<String>(
+            value: 'Option 2',
+            groupValue: _selectedOption,
+            title: const Text('Option 2'),
+            subtitle: const Text('Alternative placeholder configuration'),
+            onChanged: (value) => setState(() => _selectedOption = value),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepImportPdf() {
+    return _StepScaffoldCard(
+      title: '2. Import the customer PDF',
+      subtitle:
+          'Load the customer planimetry. Once imported, save to continue.',
+      child: Column(
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.icon(
+              onPressed: _importPdf,
+              icon: const Icon(Icons.picture_as_pdf),
+              label: Text(_hasPdf ? 'Replace PDF' : 'Import PDF'),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: _buildStageBoard(showQuote: false, showMachine: false),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepSetQuote() {
+    return _StepScaffoldCard(
+      title: '3. Set the quote',
+      subtitle:
+          'Drag the line and its handles over a known dimension, switch orientation when needed, then set the real-world length.',
+      child: Column(
+        children: [
+          Row(
+            children: [
+              FilledButton.icon(
+                onPressed: _hasPdf ? _setQuoteScale : null,
+                icon: const Icon(Icons.straighten),
+                label: const Text('Set quote'),
+              ),
+              const SizedBox(width: 12),
+              FilledButton.tonalIcon(
+                onPressed: _hasPdf ? _toggleQuoteOrientation : null,
+                icon: Icon(
+                  _quoteAngleRad == 0 ? Icons.swap_vert : Icons.swap_horiz,
+                ),
+                label: Text(_quoteAngleRad == 0 ? 'Vertical' : 'Horizontal'),
+              ),
+              const SizedBox(width: 12),
+              if (_hasScale)
+                Chip(
+                  label: Text(_quoteLabel),
+                  backgroundColor: Colors.green.shade50,
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: _buildStageBoard(
+              showQuote: true,
+              showMachine: false,
+              onMoveQuote: _moveQuote,
+              onDragLeftHandle: (dx) => _dragLeftQuoteHandle(Offset(dx, 0)),
+              onDragRightHandle: (dx) => _dragRightQuoteHandle(Offset(dx, 0)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepPlaceMachine() {
+    return _StepScaffoldCard(
+      title: '4. Place and rotate the machinery',
+      subtitle:
+          'Move the machine footprint on the calibrated plan and adjust rotation before saving.',
+      child: Column(
+        children: [
+          Row(
+            children: [
+              FilledButton.tonalIcon(
+                onPressed:
+                    _canPlaceMachine
+                        ? () =>
+                            setState(() => _machineRotationRad -= math.pi / 12)
+                        : null,
+                icon: const Icon(Icons.rotate_left),
+                label: const Text('Rotate'),
+              ),
+              const SizedBox(width: 12),
+              FilledButton.tonalIcon(
+                onPressed:
+                    _canPlaceMachine
+                        ? () =>
+                            setState(() => _machineRotationRad += math.pi / 12)
+                        : null,
+                icon: const Icon(Icons.rotate_right),
+                label: const Text('Rotate'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: _buildStageBoard(
+              showQuote: true,
+              showMachine: true,
+              onMoveMachine: _moveMachine,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepExport() {
+    return _StepScaffoldCard(
+      title: '5. Export',
+      subtitle:
+          'Review the final composition and export the layout preview as PDF.',
+      child: Column(
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.icon(
+              onPressed: _hasPdf ? _exportProcedurePdf : null,
+              icon: const Icon(Icons.ios_share),
+              label: const Text('Export PDF'),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: RepaintBoundary(
+              key: _exportKey,
+              child: _buildStageBoard(showQuote: true, showMachine: true),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Shared helper — builds the _PdfStageBoard with current state.
+  Widget _buildStageBoard({
+    required bool showQuote,
+    required bool showMachine,
+    ValueChanged<Offset>? onMoveQuote,
+    ValueChanged<double>? onDragLeftHandle,
+    ValueChanged<double>? onDragRightHandle,
+    ValueChanged<Offset>? onMoveMachine,
+  }) {
+    return _PdfStageBoard(
+      pdfBytes: _pdfBytes,
+      pdfSize: _pdfSize,
+      showQuote: showQuote,
+      quotePosition: _quotePosition,
+      quoteLengthPx: _quoteLengthPx,
+      quoteLabel: _quoteLabel,
+      onMoveQuote: onMoveQuote,
+      onDragLeftHandle: onDragLeftHandle,
+      onDragRightHandle: onDragRightHandle,
+      showMachine: showMachine,
+      machineAssetPath: _machineDrawingAssetPath,
+      machineTopLeft: _machineTopLeft,
+      machineWidthPx: _machineWidthPx,
+      machineHeightPx: _machineHeightPx,
+      machineRotationRad: _machineRotationRad,
+      machineScale: _machineSvgScale,
+      onMoveMachine: onMoveMachine,
+    );
+  }
+
+  // ─── Build ───────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    final steps = [
+    const steps = [
       'Configure machine',
       'Import PDF',
       'Set quote',
       'Place machinery',
       'Export',
     ];
-
-    final bool hideChecklist = _boardFullscreen && _stepUsesBoard;
 
     return Scaffold(
       appBar: AppBar(
@@ -613,7 +597,7 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
       body: SafeArea(
         child: Column(
           children: [
-            if (!hideChecklist) ...[
+            if (!_stepUsesBoard) ...[
               const SizedBox(height: 12),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -635,9 +619,9 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
             Expanded(
               child: Padding(
                 padding: EdgeInsets.fromLTRB(
-                  hideChecklist ? 0 : 16,
+                  _stepUsesBoard ? 0 : 16,
                   0,
-                  hideChecklist ? 0 : 16,
+                  _stepUsesBoard ? 0 : 16,
                   16,
                 ),
                 child: _buildCurrentStep(),
@@ -652,9 +636,7 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
           children: [
             if (_currentStep > 0)
               OutlinedButton.icon(
-                onPressed: () {
-                  setState(() => _currentStep -= 1);
-                },
+                onPressed: () => setState(() => _currentStep -= 1),
                 icon: const Icon(Icons.arrow_back),
                 label: const Text('Back'),
               )
@@ -680,9 +662,9 @@ class _LayoutProcedurePageState extends State<LayoutProcedurePage> {
   }
 }
 
-// ------------------------------
-// Remaining widgets: _ProcedureChecklist, _StepScaffoldCard
-// ------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
+// _ProcedureChecklist
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _ProcedureChecklist extends StatelessWidget {
   const _ProcedureChecklist({
@@ -712,8 +694,11 @@ class _ProcedureChecklist extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               decoration: BoxDecoration(
+                // Fix #8: withOpacity → withValues
                 color:
-                    active ? MyColors.primary.withOpacity(0.10) : Colors.white,
+                    active
+                        ? MyColors.primary.withValues(alpha: 0.10)
+                        : Colors.white,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color:
@@ -773,6 +758,10 @@ class _ProcedureChecklist extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// _StepScaffoldCard
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _StepScaffoldCard extends StatelessWidget {
   const _StepScaffoldCard({
     required this.title,
@@ -828,9 +817,9 @@ class _StepScaffoldCard extends StatelessWidget {
   }
 }
 
-// ------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 // _PdfStageBoard
-// ------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _PdfStageBoard extends StatelessWidget {
   const _PdfStageBoard({
@@ -907,89 +896,79 @@ class _PdfStageBoard extends StatelessWidget {
             height: pdfSize!.height,
             child: Stack(
               children: [
-                /// PDF BACKGROUND
                 Positioned.fill(
                   child: Image.memory(pdfBytes!, fit: BoxFit.fill),
                 ),
-
-                /// QUOTE LINE
-                if (showQuote)
-                  Positioned(
-                    left: quotePosition.dx,
-                    top: quotePosition.dy,
-                    child: GestureDetector(
-                      onPanUpdate:
-                          onMoveQuote == null
-                              ? null
-                              : (details) => onMoveQuote!(details.delta),
-                      child: Stack(
-                        alignment: Alignment.centerLeft,
-                        children: [
-                          SizedBox(width: quoteLengthPx, height: 30),
-
-                          CustomPaint(
-                            painter: QuotePainter(
-                              quoteLengthPx,
-                              label: quoteLabel,
-                            ),
-                            child: SizedBox(width: quoteLengthPx, height: 30),
-                          ),
-
-                          if (onDragLeftHandle != null)
-                            Positioned(
-                              left: -10,
-                              child: GestureDetector(
-                                onPanUpdate:
-                                    (d) => onDragLeftHandle!(d.delta.dx),
-                                behavior: HitTestBehavior.translucent,
-                                child: const SizedBox(width: 20, height: 20),
-                              ),
-                            ),
-
-                          if (onDragRightHandle != null)
-                            Positioned(
-                              right: -10,
-                              child: GestureDetector(
-                                onPanUpdate:
-                                    (d) => onDragRightHandle!(d.delta.dx),
-                                behavior: HitTestBehavior.translucent,
-                                child: const SizedBox(width: 20, height: 20),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                /// MACHINE OVERLAY
-                if (showMachine)
-                  Positioned(
-                    left: machineTopLeft.dx,
-                    top: machineTopLeft.dy,
-                    child: GestureDetector(
-                      onPanUpdate:
-                          onMoveMachine == null
-                              ? null
-                              : (details) => onMoveMachine!(details.delta),
-                      child: Transform.rotate(
-                        alignment: Alignment.center,
-                        angle: machineRotationRad,
-                        child: SizedBox(
-                          width: machineWidthPx,
-                          height: machineHeightPx,
-                          child: Transform.scale(
-                            scale: machineScale,
-                            alignment: Alignment.topLeft,
-                            child: SvgPicture.asset(
-                              machineAssetPath,
-                              fit: BoxFit.contain,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                if (showQuote) _buildQuoteOverlay(),
+                if (showMachine) _buildMachineOverlay(),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuoteOverlay() {
+    return Positioned(
+      left: quotePosition.dx,
+      top: quotePosition.dy,
+      child: GestureDetector(
+        onPanUpdate:
+            onMoveQuote == null
+                ? null
+                : (details) => onMoveQuote!(details.delta),
+        child: Stack(
+          alignment: Alignment.centerLeft,
+          children: [
+            SizedBox(width: quoteLengthPx, height: 30),
+            CustomPaint(
+              painter: QuotePainter(quoteLengthPx, label: quoteLabel),
+              child: SizedBox(width: quoteLengthPx, height: 30),
+            ),
+            if (onDragLeftHandle != null)
+              Positioned(
+                left: -10,
+                child: GestureDetector(
+                  onPanUpdate: (d) => onDragLeftHandle!(d.delta.dx),
+                  behavior: HitTestBehavior.translucent,
+                  child: const SizedBox(width: 20, height: 20),
+                ),
+              ),
+            if (onDragRightHandle != null)
+              Positioned(
+                right: -10,
+                child: GestureDetector(
+                  onPanUpdate: (d) => onDragRightHandle!(d.delta.dx),
+                  behavior: HitTestBehavior.translucent,
+                  child: const SizedBox(width: 20, height: 20),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMachineOverlay() {
+    return Positioned(
+      left: machineTopLeft.dx,
+      top: machineTopLeft.dy,
+      child: GestureDetector(
+        onPanUpdate:
+            onMoveMachine == null
+                ? null
+                : (details) => onMoveMachine!(details.delta),
+        child: Transform.rotate(
+          alignment: Alignment.center,
+          angle: machineRotationRad,
+          child: SizedBox(
+            width: machineWidthPx,
+            height: machineHeightPx,
+            child: Transform.scale(
+              scale: machineScale,
+              alignment: Alignment.topLeft,
+              child: SvgPicture.asset(machineAssetPath, fit: BoxFit.contain),
             ),
           ),
         ),
